@@ -1,0 +1,12 @@
+
+
+Dependencies:
+
+python
+- BioPython
+- Pyrex
+- pysam
+
+R
+- R.methodsS3
+- R.oo
