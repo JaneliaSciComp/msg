@@ -1,0 +1,7 @@
+R.methodsS3-package                                         Package R.methodsS3
+findDispatchMethodsS3                                       Finds the S3 methods that a generic function would call
+getDispatchMethodS3                                         Gets the S3 method that a generic function would call
+getGenericS3                                                Get an S3 generic function
+getMethodS3                                                 Get an S3 method
+setMethodS3                                                 Creates an S3 method
+throw                                                       Throws an exception

@@ -1,0 +1,22 @@
+Package: R.oo
+Version: 1.7.3
+Date: 2010-06-04
+Title: R object-oriented programming with or without references
+Author: Henrik Bengtsson <henrikb@braju.com>
+Maintainer: Henrik Bengtsson <henrikb@braju.com>
+Depends: R (>= 2.2.0), R.methodsS3 (>= 1.2.0), utils
+Suggests: tools
+Imports: methods
+Description: Methods and classes for object-oriented programming in R with or without references.  Large effort has been made on making definition of methods as simple as possible
+                    with a minimum of maintenance for package developers.  The package has been developed since 2001 and is now considered very stable. This is a cross-platform
+                    package implemented in pure R that defines standard S3 classes without any tricks.
+License: LGPL (>= 2.1)
+URL: http://www.braju.com/R/
+DevelURL: http://www.braju.com/R/
+LazyLoad: TRUE
+Repository: CRAN
+Repository/R-Forge/Project: r-dots
+Repository/R-Forge/Revision: 365
+Date/Publication: 2010-06-05 17:59:10
+Packaged: 2010-06-04 20:41:06 UTC; rforge
+Built: R 2.11.1; ; 2010-09-22 20:51:53 UTC; unix

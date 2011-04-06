@@ -1,0 +1,20 @@
+Package: R.methodsS3
+Version: 1.2.0
+Date: 2010-03-13
+Title: Utility function for defining S3 methods
+Author: Henrik Bengtsson <henrikb@braju.com>
+Maintainer: Henrik Bengtsson <henrikb@braju.com>
+Depends: R (>= 2.2.0)
+Imports: utils
+Description: Methods that simplify the setup of S3 generic functions and S3 methods.  Major effort has been made in making definition of methods as simple as possible with a
+                    minimum of maintenance for package developers.  For example, generic functions are created automatically, if missing, and naming conflict are automatically
+                    solved, if possible.  The method setMethodS3() is a good start for those who in the future want to migrate to S4.  This is a cross-platform package implemented
+                    in pure R and generates standard S3 methods.
+License: LGPL (>= 2.1)
+URL: http://www.braju.com/R/
+DevelURL: http://www.braju.com/R/
+LazyLoad: TRUE
+Packaged: 2010-03-13 11:11:24 UTC; hb
+Repository: CRAN
+Date/Publication: 2010-03-14 15:05:49
+Built: R 2.11.1; ; 2010-09-22 20:51:51 UTC; unix
