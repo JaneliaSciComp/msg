@@ -122,6 +122,9 @@ save(rhat.offdiag, file="rhat-offdiag.rda")
 rlod.offdiag <- est.rf.p.profile(p=p, offdiag=TRUE, lod=TRUE)
 save(rlod.offdiag, file="rlod-offdiag.rda")
 
+### save offdiag data
+write.table(cbind(pos, rhat.offdiag, rlod.offdiag),file="offdiagonal_data.tsv",sep="\t",quote=F,row.names=F,col.names=c("pos", "rhat", "rlod"))
+
 pdf(file.path(imagedir, "offdiagonal-lod.pdf"), width=10, height=5)
 genomeplot(rlod.offdiag, ylab="LOD")
 abline(h=25, col="red")
