@@ -230,9 +230,9 @@ else {
 if ($params{'cluster'} != 0) {
    system("qsub -l $params{'queue'} -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
    #system("qsub -l $params{'queue'} -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
-   system("qsub -l $params{'queue'} -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
-   system("qsub -l $params{'queue'} -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
-   system("qsub -l $params{'queue'} -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   system("qsub -l long -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   system("qsub -l 1hr -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   system("qsub -l 1hr -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
    system("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    system("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
