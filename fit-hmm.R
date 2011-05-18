@@ -30,6 +30,9 @@ contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
 contigs <- sort(as.vector(contigLengths$chr))
 rownames(contigLengths) <- contigLengths$chr
 
+### Expected number of recombination events
+r <- as.numeric(opts$a) / sum(contigLengths[,"length"])
+
 main.contigs <- unlist(strsplit(opts$c,split=","))
 plot.contigs <- unlist(strsplit(opts$y,split=","))
 if(opts$c == "all") main.contigs <- contigs;
@@ -125,13 +128,6 @@ for(indiv in indivs) {
             K <- length(ancestries)
 
             ## Transition probabilities
-            if(contig %in% main.contigs) {
-                r <- 1 / contigLengths[contig,"length"]
-				} else {
-                cat("\tContig ", contig, " not found in main.contigs - defaulting to contig length of ", contigLengths[1,"chr"], "\n")
-                r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
-				}
-
             d <- c(NA, diff(data$pos))
             p <- 1 - exp(-r*d*rfac)
             Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))

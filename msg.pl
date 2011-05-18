@@ -34,6 +34,7 @@ GetOptions(
 	'chroms2plot=s' => \$chroms2plot,
 	'deltapar1=s' => \$deltapar1,
 	'deltapar2=s' => \$deltapar2,
+	'recRate=s' => \$recRate,
 	'rfac=s' => \$rfac,
 	'bwaindex1=s' => \$bwaindex1,
 	'bwaindex2=s' => \$bwaindex2
@@ -207,6 +208,7 @@ if ($parse_or_map eq '--map-only') {
    			 '-y', $chroms2plot,
    			 '-f', $deltapar1,
    			 '-g', $deltapar2,
+   			 '-a', $recRate,
    			 '-r', $rfac,
    			 '-x', $sexchroms,
    			 '-z', $priors
