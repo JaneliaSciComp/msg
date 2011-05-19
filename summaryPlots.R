@@ -123,7 +123,7 @@ rlod.offdiag <- est.rf.p.profile(p=p, offdiag=TRUE, lod=TRUE)
 save(rlod.offdiag, file="rlod-offdiag.rda")
 
 ### save offdiag data
-write.table(cbind(info$contigs, pos, rhat.offdiag, rlod.offdiag),file="offdiagonal_data.tsv",sep="\t",quote=F,row.names=F,col.names=c("chrom", "pos", "rhat", "rlod"))
+write.table(cbind(as.vector(contig.fac), pos, rhat.offdiag, rlod.offdiag),file="offdiagonal_data.tsv",sep="\t",quote=F,row.names=F,col.names=c("chrom", "pos", "rhat", "rlod"))
 
 pdf(file.path(imagedir, "offdiagonal-lod.pdf"), width=10, height=5)
 genomeplot(rlod.offdiag, ylab="LOD")
