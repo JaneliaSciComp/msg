@@ -164,7 +164,7 @@ if ($params{'cluster'} != 0) {
        ' --parse_or_map map-only' .
        ' --deltapar1 ' . $params{'deltapar1'} .
        ' --deltapar2 ' . $params{'deltapar2'} .
-       ' --recRate' . $params{'recRate'} .
+       ' --recRate ' . $params{'recRate'} .
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
        " || exit 100\ndone\n" .
@@ -182,7 +182,7 @@ if ($params{'cluster'} != 0) {
        ' --parse_or_map map-only' .
        ' --deltapar1 ' . $params{'deltapar1'} .
        ' --deltapar2 ' . $params{'deltapar2'} .
-       ' --recRate' . $params{'recRate'} .
+       ' --recRate ' . $params{'recRate'} .
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
        "\n";
