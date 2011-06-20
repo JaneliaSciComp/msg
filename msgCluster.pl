@@ -23,7 +23,7 @@ my %params = (
 	      deltapar1      => '.01',
 	      deltapar2      => '.01',
 	      recRate        => '3',
-	      rfac		      => '1',
+	      rfac		      => '0.00001',
 	      thinfac	      => '1',
 	      difffac	      => '.01',
 	      priors         => '0,.5,.5',
@@ -31,8 +31,7 @@ my %params = (
 	      bwaindex2      => 'bwtsw',
 	      pnathresh      => '0.03',
 	      cluster        => '1',
-	      threads        => '1',
-	      queue          => '1day'
+	      threads        => '8'
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -169,6 +168,7 @@ if ($params{'cluster'} != 0) {
        ' --recRate ' . $params{'recRate'} .
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
+       ' --theta ' . $params{'theta'} .
        " || exit 100\ndone\n" .
        "/bin/date\n";
 } else {
@@ -187,6 +187,7 @@ if ($params{'cluster'} != 0) {
        ' --recRate ' . $params{'recRate'} .
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
+       ' --theta ' . $params{'theta'} .
        "\n";
     }
 close OUT;

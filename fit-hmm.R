@@ -20,6 +20,7 @@ deltapar1 <- as.numeric(opts$p)
 deltapar2 <- as.numeric(opts$q)
 rfac <- as.numeric(opts$r)
 priors <- unlist(strsplit(opts$z,split=","))
+theta <- opts$t
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -29,9 +30,6 @@ minCoverage <- 0;
 contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
 contigs <- sort(as.vector(contigLengths$chr))
 rownames(contigLengths) <- contigLengths$chr
-
-### Expected number of recombination events
-r <- as.numeric(opts$a) / sum(contigLengths[,"length"])
 
 main.contigs <- unlist(strsplit(opts$c,split=","))
 plot.contigs <- unlist(strsplit(opts$y,split=","))
@@ -43,6 +41,7 @@ aveSpace <- sum(as.numeric(contigLengths[contigLengths$chr %in% plot.contigs,]$l
 plotPadding <- 10^(ceiling(log10(aveSpace))-2)
 
 alleles <- c("A","C","G","T")
+
 
 for(indiv in indivs) {
     cat(indiv, "\n")
@@ -78,6 +77,7 @@ for(indiv in indivs) {
                 next
             } 
 
+
             data <- read.data(dir, indiv, contig)
             data$read <- factor.contiguous(data$pos)
             total_sites <- length(unique(data$read));
@@ -104,12 +104,12 @@ for(indiv in indivs) {
             cat("\tRemoving", sum(!ok), "sites at which par1 == par2\n")
             data <- data[ok,,drop=F]
 
-				data$count <- data$A + data$C + data$G + data$T #+ data$N
-				ok <- data$count >= minCoverage
+			data$count <- data$A + data$C + data$G + data$T #+ data$N
+			ok <- data$count >= minCoverage
             cat("\tRemoving", sum(!ok), "sites at where coverage is < ",minCoverage,"\n")
-				data <- data[ok,,drop=F]
+			data <- data[ok,,drop=F]
 
-				if (nrow(data)==0) next
+			if (nrow(data)==0) next
             
             if(one.site.per.read) {
                 ## Sample one site per read
@@ -121,13 +121,22 @@ for(indiv in indivs) {
                 cat("\tNumber of informative markers:", nrow(data), "\n")
             }
 
+
             cat("\tFinal total of", nrow(data), "sites at which par1 != par2\n")
 				#if (nrow(data)<20) next
-
+			if (nrow(data)==0) next
+			
             L <- nrow(data)
             K <- length(ancestries)
 
             ## Transition probabilities
+            if(contig %in% main.contigs) {
+                r <- 1 / contigLengths[contig,"length"]
+				} else {
+                cat("\tContig ", contig, " not found in main.contigs - defaulting to contig length of ", contigLengths[1,"chr"], "\n")
+                r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
+				}
+
             d <- c(NA, diff(data$pos))
             p <- 1 - exp(-r*d*rfac)
             Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
@@ -152,46 +161,44 @@ for(indiv in indivs) {
             p2 <- ppar2[data$par2ref,,drop=F]
             p12 <- array(c(p1,p2), dim=c(dim(p1),2))
             dimnames(p12) <- list(NULL, alleles, NULL)
-            
-            ## Sample one read per site
+
+		    ## Take all (<=50) reads for each site
+		    N<-min(max(data$A+data$C+data$G+data$T+data$N),50) ## Total number of reads
+			#theta <-1 ## quality value correction - defined by passed option
+			eps<-paste('eps',seq(1,N,by=1),sep='')
+			read<-paste('read',seq(1,N,by=1),sep='')
             y <- data[,c(alleles,"reads","quals","par1ref"),drop=F]
-				y$selected_allele <- NA
-				y$selected_qual <- NA
-
+			y$selected_allele <- NA
+			y[,eps]<-rep(0,N)
+			y[,read]<-rep(5,N)
+			fun<-function (x) {
+				if (x=='A')	return (0)
+				if (x=='C')	return (1)
+				if (x=='G')	return (2)
+				if (x=='T')	return (3)
+				if (x=='N') return (5)
+			}
             for(i in 1:nrow(y)) {
-					 if (sum(y[i,alleles]) > 1) {
-					 	reads2sample <- unlist(strsplit(cleanupReadPileup(y[i,"reads"],y[i,"par1ref"]),''))
-						sampled_index <- sample(length(reads2sample),1)
-					 	y[i,"selected_allele"] <- reads2sample[sampled_index]
-					 	y[i,"selected_qual"] <- unlist(strsplit(y[i,"quals"],''))[sampled_index]
-					 } else {
-						y[i,"selected_allele"] <- alleles[which(y[i,alleles] == 1)]
-
-                  ### is the length > 1?  if so, need to remove the other QVs corresponding to N's and others
-						y[i,"selected_qual"] <- y[i,"quals"]
-                  if (nchar(y[i,"quals"])>1) {
-						   #y[i,"selected_qual"] <- unlist(strsplit(data[i,"quals"],""))[which(unlist(strsplit(cleanupReadPileup(data[i,"reads"],y[i,"par1ref"]),""))==y[i,"selected_allele"])]
-							y_info <- list(reads=cleanupReadPileup(y[i,"reads"],y[i,"par1ref"]),quals=y[i,"quals"])
-							#y_info <- list(reads=y[i,"reads"],quals=y[i,"quals"])
-							y[i,"selected_qual"] <- removeNs(y_info$reads,y_info$quals)
-                  }
-					 }
-					 y[i,alleles] <- 0
-					 y[i,y[i,"selected_allele"]] <- 1
+				total.reads <- unlist(strsplit(cleanupReadPileup(y[i,"reads"],y[i,"par1ref"]),''))
+				y[i,"selected_allele"] <- total.reads[sample(length(total.reads),1)] ## Sample one read for plotting
+				qual<-NULL
+				qual_corrected<-NULL
+				for (s in 1:min(length(total.reads),N)){
+					y[i,read[s]] <-lapply(total.reads[s],fun)
+					qual<-c(qual,(charToInt(unlist(strsplit(y[i,"quals"],''))[s])-33))
 				}
+						
+				for (g in 1:length(qual)) {
+					qual_corrected[g]<-qual[g]*(theta^(order(qual)[g]-1)) ## quality value correction
+					y[i,eps[g]] <- 10^(-(qual_corrected[g])/10)
+				}
+			}
 
-				data$read_allele <- as.vector(y[,"selected_allele"])
-				data$read_qual   <- as.vector(y[,"selected_qual"])
-
-				### set epsilon based on quality value
-				### Phred QV = -10 log10(error)
-				data$eps <- 10^(-(unlist(lapply(data[,"read_qual",drop=F],charToInt))-33)/10)
-				data <- data[is.na(data$eps)==F,,drop=F];
-				if (nrow(data)==0) next
-
+			data$read_allele <- as.vector(y[,"selected_allele"])
+			
             ## Emission probabilities
-            prob = Pr.y.given.z(y=y[,alleles,drop=F], p=p12, eps=data$eps, ploidy=ploidy, C=TRUE, dir=dirname(dollar0), chrom=contig, id=indiv)
-            colnames(prob) <- paste("Pr(y|", ancestries, ")")
+            prob = Pr.y.given.z(y=y[,read,drop=F], p=p12, n=N, eps=y[,eps,drop=F], ploidy=ploidy, C=TRUE, dir=dirname(dollar0), chrom=contig, id=indiv)
+   			colnames(prob) <- paste("Pr(y|", ancestries, ")")
             data <- cbind(data, prob)
             data$est <- apply(prob, 1, which.max)
             
@@ -203,11 +210,13 @@ for(indiv in indivs) {
             data <- cbind(data, Pr.z.given.y)
             attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
+        
         }
         cat("Saving data...")
         save(dataa, file=hmmdata.file)
         cat("OK\n")
     }
+    
     
     contigLengths <- contigLengths[plot.contigs,]
 
