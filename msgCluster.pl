@@ -90,6 +90,7 @@ if (exists $params{'parent1_reads'}) {
 	' --parent1 ' . $params{'parent1'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --parent1-reads ' . $params{'parent1_reads'} .
+	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
 	' --bwaindex2 ' . $params{'bwaindex2'} .
 	" || exit 100\n";
@@ -110,6 +111,7 @@ if (exists $params{'parent2_reads'}) {
 	' --parent2 ' . $params{'parent2'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --parent2-reads ' . $params{'parent2_reads'} .
+	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
 	' --bwaindex2 ' . $params{'bwaindex2'} .
 	" || exit 100\n";
@@ -198,9 +200,9 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 ### Run jobs!
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-      system("qsub -l long -N msgRun0-1.$$ -l job_capacity=$update_nthreads -cwd -sync n ./msgRun0-1.sh") ;
-      system("qsub -l long -N msgRun0-2.$$ -l job_capacity=$update_nthreads -cwd -sync n ./msgRun0-2.sh") ;
-      system("qsub -l long -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -sync n ./msgRun1.sh") ;
+      system("qsub -N msgRun0-1.$$  -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun0-2.$$  -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
       system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
@@ -209,8 +211,8 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent1_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -l long -N msgRun0-1.$$ -l job_capacity=$update_nthreads -cwd -sync n ./msgRun0-1.sh") ;
-      system("qsub -l long -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -sync n ./msgRun1.sh") ;
+      system("qsub -N msgRun0-1.$$ -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
       system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
@@ -218,24 +220,24 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -l long -N msgRun0-2.$$ -l job_capacity=$update_nthreads -cwd -sync n ./msgRun0-2.sh") ;
-      system("qsub -l long -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -sync n ./msgRun1.sh") ;
+      system("qsub -N msgRun0-2.$$ -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
       system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
    }
 }
 else { 
-   if ($params{'cluster'} != 0) { system("qsub -l long -N msgRun1.$$ -cwd -sync n ./msgRun1.sh") ; }
+   if ($params{'cluster'} != 0) { system("qsub -N msgRun1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
    else { system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
 }
 
 if ($params{'cluster'} != 0) {
-   system("qsub -l $params{'queue'} -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
-   #system("qsub -l $params{'queue'} -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
-   system("qsub -l long -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
-   system("qsub -l 1hr -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
-   system("qsub -l 1hr -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -l excl=true -b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
+   #system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
+   system("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -l excl=true -b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   system("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
    system("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    system("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
