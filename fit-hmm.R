@@ -20,7 +20,7 @@ deltapar1 <- as.numeric(opts$p)
 deltapar2 <- as.numeric(opts$q)
 rfac <- as.numeric(opts$r)
 priors <- unlist(strsplit(opts$z,split=","))
-theta <- opts$t
+theta <- as.numeric(opts$t)
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
