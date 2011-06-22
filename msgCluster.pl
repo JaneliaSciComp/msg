@@ -31,7 +31,8 @@ my %params = (
 	      bwaindex2      => 'bwtsw',
 	      pnathresh      => '0.03',
 	      cluster        => '1',
-	      threads        => '8'
+	      threads        => '8',
+	      theta        => '1',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
