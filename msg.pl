@@ -12,7 +12,7 @@ sub system_call {
 
 $src = dirname $0 ;
 $update_genomes = $false ;
-$update_nthreads = 1 ; ## Number of BWA threads when updating genomes (must match msgCluster.pl)
+$update_nthreads = 8 ; ## Number of BWA threads when updating genomes (must match msgCluster.pl)
 
 GetOptions(
 	'barcodes|b=s' => \$barcodes,
