@@ -1,0 +1,8 @@
+*.pyc
+*~
+bin/
+include/
+lib/
+lib64/
+share/
+samtools-0.1.7/
