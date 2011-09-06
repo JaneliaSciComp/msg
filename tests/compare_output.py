@@ -20,7 +20,6 @@ script isn't for you.
 
 """
 
-import tarfile
 import hashlib
 import os
 import sys
@@ -31,20 +30,37 @@ except ImportError:
     print "Make sure you copied checksums.example.py and renamed it to checksums.py"
     sys.exit(1)
 
-def get_dir_md5(dir_path):
-    """Build a tar file of the directory and return its md5 sum"""
-    temp_tar_path = 'msg_tests.tar'
-    t = tarfile.TarFile(temp_tar_path,mode='w')  
-    t.add(dir_path)
-    t.close()
+def get_dir_md5(dir_root):
+    """Walk the directory and return its md5 sum
+    Got some code and ideas from this post: 
+    http://stackoverflow.com/questions/7325072/python-md5-of-tar-file-changes-after-file-changes-even-if-files-are-identical
+    """
+    hash = hashlib.md5()
+    for dirpath, dirnames, filenames in os.walk(dir_root, topdown=True):
+        dirnames.sort(key=os.path.normcase)
+        filenames.sort(key=os.path.normcase)
 
-    m = hashlib.md5()
-    m.update(open(temp_tar_path,'rb').read())
-    ret_str = m.hexdigest()
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
 
-    #delete tar file
-    os.remove(temp_tar_path)
-    return ret_str
+            # If some metadata is required, add it to the checksum
+
+            # 1) filename (good idea)
+            hash.update(os.path.normcase(os.path.relpath(filepath, dir_root)))
+
+            # 2) mtime (possibly a bad idea)
+            # st = os.stat(filepath)
+            # hash.update(struct.pack('d', st.st_mtime))
+
+            # 3) size (good idea perhaps)
+            # hash.update(bytes(st.st_size))
+
+            f = open(filepath, 'rb')
+            for chunk in iter(lambda: f.read(65536), b''):
+                hash.update(chunk)
+            f.close()
+
+    return hash.hexdigest()
 
 def main():
     """Parse command line args, and call appropriate functions."""
