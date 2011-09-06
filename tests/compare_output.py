@@ -23,8 +23,13 @@ script isn't for you.
 import tarfile
 import hashlib
 import os
+import sys
 
-import checksums
+try:
+    import checksums
+except ImportError:
+    print "Make sure you copied checksums.example.py and renamed it to checksums.py"
+    sys.exit(1)
 
 def get_dir_md5(dir_path):
     """Build a tar file of the directory and return its md5 sum"""
