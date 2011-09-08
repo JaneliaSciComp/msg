@@ -5,7 +5,7 @@ if ! perl --version >/dev/null 2>/dev/null ; then
 	exit 1
 fi
 
-if ! python --version >/dev/null 2>/dev/null ; then
+if ! python -V >/dev/null 2>/dev/null ; then
 	echo "Please install python somewhere in your PATH"
 	exit 1
 fi
