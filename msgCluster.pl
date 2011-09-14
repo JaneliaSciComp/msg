@@ -33,6 +33,7 @@ my %params = (
 	      cluster        => '1',
 	      threads        => '8',
 	      theta        => '1',
+          min_coverage => '2',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -89,11 +90,16 @@ if (exists $params{'parent1_reads'}) {
 	' --reads ' . $params{'reads'} . 
 	' --parent1 ' . $params{'parent1'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
+	' --min_coverage ' . $params{'min_coverage'} .
 	' --parent1-reads ' . $params{'parent1_reads'} .
 	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'} .
-	" || exit 100\n";
+	' --bwaindex2 ' . $params{'bwaindex2'};
+    #Add on optional arguments
+    if (defined $params{'max_coverage_stds'}) {
+        print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
+    }
+	print OUT " || exit 100\n";
     close OUT;
     system("chmod 755 msgRun0-1.sh");
     $params{'parent1'} .= '.msg.updated.fasta';
@@ -110,11 +116,16 @@ if (exists $params{'parent2_reads'}) {
 	' --reads ' . $params{'reads'} . 
 	' --parent2 ' . $params{'parent2'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
+	' --min_coverage ' . $params{'min_coverage'} .
 	' --parent2-reads ' . $params{'parent2_reads'} .
 	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'} .
-	" || exit 100\n";
+	' --bwaindex2 ' . $params{'bwaindex2'};
+    #Add on optional arguments
+    if (defined $params{'max_coverage_stds'}) {
+        print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
+    }
+	print OUT " || exit 100\n";
     close OUT;
     system("chmod 755 msgRun0-2.sh");
     $params{'parent2'} .= '.msg.updated.fasta';

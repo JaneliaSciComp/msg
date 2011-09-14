@@ -1,7 +1,8 @@
 #!/usr/bin/perl -w
 # updateRef.pl
-# 12.03.09
-# Tina
+# Example call:
+# perl updateRef.pl dsim-all-chromosome-r1.3.fasta.msg update_reads-aligned-parent1.pileup 0 1 2 5
+
 use strict;
 use warnings;
 use Getopt::Std;
@@ -9,18 +10,34 @@ use File::Basename;
 
 my $src = dirname $0 ;
 
-my ($refFile,$pileupFile,$add_indels,$minQV,$min_coverage) = @ARGV;
-die "\n USAGE: updateRef.pl <reference_fasta_file> <pileup_file> <incorporate indels> <min QV (Sanger)> <min read coverage>\n\n" if (@ARGV<4);
+my ($refFile,$pileupFile,$add_indels,$minQV,$min_coverage,$max_coverage_stds) = @ARGV;
+die "\n USAGE: updateRef.pl <reference_fasta_file> <pileup_file> <incorporate indels> <min QV (Sanger)> <min read coverage> <max read coverage std. dev.s>\n\n" if (@ARGV<4);
 
 $min_coverage = 2 unless (defined $min_coverage);
+#default for max_coverage_stds is undef, which means there is no max.
 
 my %refReads = &readFasta($refFile);
 my $outfile  = "$refFile.updated";
 print "UPDATE REFERENCE FILE: $outfile\n";
 print "\tmin read coverage: $min_coverage\n" .
 		"\tmin qv threshold: $minQV\n";
+if (defined $max_coverage_stds) {
+    print "\tmax read coverage (in std. dev.s): $max_coverage_stds\n";
+}
+else {
+    print "\tmax read coverage (in std. dev.s): NA\n";
+}
+
 unlink ("$outfile.fastq") if (-e "$outfile.fastq");
-my ($genome_total,$genome_uncovered,%coveredContigs) = &pileup2fq($pileupFile,"$outfile.fastq",\%refReads); # replace regions in the reference with the solexa calls
+
+my $max_coverage;
+if (defined $max_coverage_stds) {
+    $max_coverage = get_max_coverage($pileupFile, $max_coverage_stds);
+    print "\tmax read coverage value: $max_coverage\n";
+}
+
+my ($genome_total,$genome_uncovered,%coveredContigs) = &pileup2fq($pileupFile,"$outfile.fastq",\%refReads,
+    $max_coverage); # replace regions in the reference with the solexa calls
 
 
 ### print out uncovered contigs
@@ -54,6 +71,50 @@ exit;
 
 ####################################################################################################
 ####################################################################################################
+
+sub sum_of_array {
+    my ($values_ref) = @_;
+    my $sum = 0;
+    foreach (@$values_ref) { $sum += $_ }
+    return $sum;
+}
+
+sub get_std_deviation {
+    my ($values_ref) = @_;
+    my $mean = sum_of_array($values_ref) / scalar(@$values_ref);
+    my $total_for_var = 0;
+    foreach my $val (@$values_ref) {
+        $total_for_var += (($val - $mean)**2);
+    }
+    my $variance = $total_for_var / scalar(@$values_ref);
+    my $std = sqrt($variance);
+    return $std;
+}
+
+sub get_max_coverage {
+    #The user parameter for max coverage specifies how many standard deviations
+    #from the mean to allow.  This function returns what the actual number 
+    #that would be.
+    my ($pileup_file, $max_coverage_stds) = @_;
+
+    my $max_coverage = 0;
+    my @coverage_values;
+
+    open(FILE,$pileup_file) || die "ERROR Can't open $pileup_file: $!\n";
+    while (<FILE>) { my $line = $_; chomp $line;;
+        #column 7 (0 based) is coverage
+        my @t = split(/\s+/,$line);
+        # Only look at reads with coverage
+        if ($t[7] > 0) {
+            push (@coverage_values, $t[7]);
+        }
+    } close FILE;
+    my $mean = sum_of_array(\@coverage_values)/scalar(@coverage_values);
+    my $std = get_std_deviation(\@coverage_values);
+    $max_coverage = $mean + ($max_coverage_stds * $std);
+    return sprintf "%.0f", $max_coverage; #round to int
+}
+
 sub readFasta {
 	my ($file,$refReads) = @_;
 	my %reads;
@@ -85,7 +146,7 @@ sub readFasta {
 #          -G INT    minimum indel score  [$opts{G}]
 #          -l INT    indel filter winsize [$opts{l}]\n
 sub pileup2fq {
-  my ($file,$outfile,$refReads) = @_;
+  my ($file,$outfile,$refReads,$max_coverage) = @_;
   my %opts = (d=>1, D=>255, Q=>0, G=>0, l=>0);
 #  my %opts = (d=>3, D=>255, Q=>25, G=>25, l=>10);
   getopts('d:D:Q:G:l:', \%opts);
@@ -101,6 +162,7 @@ sub pileup2fq {
   my $last_chr = '';
   my ($uncovered,$total) = (0,0);
   my ($genome_uncovered,$genome_total) = (0,0);
+
   open(FILE,$file) || die "ERROR Can't open $file: $!\n";
   while (<FILE>) { my $line = $_; chomp $line; $counter++;
 
@@ -201,13 +263,13 @@ sub pileup2fq {
 	} elsif ($t[8] !~ /^\*+$/) {
 
 		### satisfies min_coverage AND are not all 0 (!) QVs
-		if (($t[7]>=$min_coverage) && ($t[9] !~ /^!+$/)) {
+		if (($t[7]>=$min_coverage) && ($t[9] !~ /^!+$/) && 
+            ((not (defined $max_coverage)) || $t[7]<=$max_coverage)) {
 			$seq .= uc($t[3]);
 			my $q = $t[4] + 33;
 			$q = 126 if ($q > 126);
 			$qual .= chr($q);
 			$total++;
-     
 		### use default reference
 		} else {
 			$seq .= uc($t[2]);
