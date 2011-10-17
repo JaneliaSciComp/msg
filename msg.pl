@@ -26,7 +26,8 @@ GetOptions(
 	'parent2-reads=s' => \$parent2_reads,
 	'update_minQV=i' => \$update_minQV,
 	'min_coverage=i' => \$min_coverage,
-	'max_coverage_stds=i' => \$max_coverage_stds, 
+	'max_coverage_stds=i' => \$max_coverage_stds,
+    'max_coverage_exceeded_state=s' => \$max_coverage_exceeded_state,
 	'threads|t=i' => \$update_nthreads,
 	'parse_or_map=s' => \$parse_or_map,
 	'priors=s' => \$priors,
@@ -51,6 +52,7 @@ print "parse_or_map:   $parse_or_map\n" ;
 print "chroms:         $chroms\n\n" ;
 print "sexchroms:      $sexchroms\n\n" ;
 print "max_coverage_stds $max_coverage_stds\n\n";
+print "max_coverage_exceeded_state $max_coverage_exceeded_state\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -131,7 +133,7 @@ if( $update_genomes ) {
 		}
 
 		&system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
-            $max_coverage_stds);
+            $max_coverage_exceeded_state, $max_coverage_stds);
 		unlink("$genomes_fa{$sp}.msg");
 						
 		## Re-run BWA against updated refs

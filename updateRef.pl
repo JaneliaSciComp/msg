@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # updateRef.pl
 # Example call:
-# perl updateRef.pl dsim-all-chromosome-r1.3.fasta.msg update_reads-aligned-parent1.pileup 0 1 2 5
+# perl updateRef.pl dsim-all-chromosome-r1.3.fasta.msg update_reads-aligned-parent1.pileup 0 1 2 5 N
 
 use strict;
 use warnings;
@@ -10,10 +10,11 @@ use File::Basename;
 
 my $src = dirname $0 ;
 
-my ($refFile,$pileupFile,$add_indels,$minQV,$min_coverage,$max_coverage_stds) = @ARGV;
-die "\n USAGE: updateRef.pl <reference_fasta_file> <pileup_file> <incorporate indels> <min QV (Sanger)> <min read coverage> <max read coverage std. dev.s>\n\n" if (@ARGV<4);
+my ($refFile,$pileupFile,$add_indels,$minQV,$min_coverage,$max_coverage_exceeded_state,$max_coverage_stds) = @ARGV;
+die "\n USAGE: updateRef.pl <reference_fasta_file> <pileup_file> <incorporate indels> <min QV (Sanger)> <min read coverage> <max_coverage_exceeded_state> <max read coverage std. dev.s>\n\n" if (@ARGV<4);
 
 $min_coverage = 2 unless (defined $min_coverage);
+$max_coverage_exceeded_state = "N" unless (defined $max_coverage_exceeded_state);
 #default for max_coverage_stds is undef, which means there is no max.
 
 my %refReads = &readFasta($refFile);
@@ -23,6 +24,7 @@ print "\tmin read coverage: $min_coverage\n" .
 		"\tmin qv threshold: $minQV\n";
 if (defined $max_coverage_stds) {
     print "\tmax read coverage (in std. dev.s): $max_coverage_stds\n";
+    print "\tmax coverage exceeded state: $max_coverage_exceeded_state\n";
 }
 else {
     print "\tmax read coverage (in std. dev.s): NA\n";
@@ -37,7 +39,7 @@ if (defined $max_coverage_stds) {
 }
 
 my ($genome_total,$genome_uncovered,%coveredContigs) = &pileup2fq($pileupFile,"$outfile.fastq",\%refReads,
-    $max_coverage); # replace regions in the reference with the solexa calls
+    $max_coverage, $max_coverage_exceeded_state); # replace regions in the reference with the solexa calls
 
 
 ### print out uncovered contigs
@@ -146,7 +148,7 @@ sub readFasta {
 #          -G INT    minimum indel score  [$opts{G}]
 #          -l INT    indel filter winsize [$opts{l}]\n
 sub pileup2fq {
-  my ($file,$outfile,$refReads,$max_coverage) = @_;
+  my ($file,$outfile,$refReads,$max_coverage,$max_coverage_exceeded_state) = @_;
   my %opts = (d=>1, D=>255, Q=>0, G=>0, l=>0);
 #  my %opts = (d=>3, D=>255, Q=>25, G=>25, l=>10);
   getopts('d:D:Q:G:l:', \%opts);
@@ -262,20 +264,30 @@ sub pileup2fq {
 	# read bases are NOT all *
 	} elsif ($t[8] !~ /^\*+$/) {
 
-		### satisfies min_coverage AND are not all 0 (!) QVs
-		if (($t[7]>=$min_coverage) && ($t[9] !~ /^!+$/) && 
-            ((not (defined $max_coverage)) || $t[7]<=$max_coverage)) {
-			$seq .= uc($t[3]);
-			my $q = $t[4] + 33;
-			$q = 126 if ($q > 126);
-			$qual .= chr($q);
-			$total++;
-		### use default reference
-		} else {
-			$seq .= uc($t[2]);
-			$qual .= '!';
-			$total++;
-		}
+        ### satisfies min_coverage AND are not all 0 (!) QVs
+        if (($t[7]>=$min_coverage) && ($t[9] !~ /^!+$/)) {
+            ### Mask or use default for the site if it exceeds the specified maximum coverage
+            if ((defined $max_coverage) && $t[7]>$max_coverage) {            
+                if ($max_coverage_exceeded_state eq "N") {$seq .= 'N';} #Mask it
+                elsif ($max_coverage_exceeded_state eq "D") {$seq .= uc($t[2]);} #use default reference
+                else {die "ERROR invalid value: $max_coverage_exceeded_state for max_coverage_exceeded_state. Only N or D are allowed values.";}
+			    $qual .= '!';
+			    $total++;
+            }
+            ### Satifies max coverage if defined
+            else {
+                $seq .= uc($t[3]);
+                my $q = $t[4] + 33;
+                $q = 126 if ($q > 126);
+                $qual .= chr($q);
+                $total++;
+            }
+        ### use default reference
+        } else {
+            $seq .= uc($t[2]);
+            $qual .= '!';
+            $total++;
+        }
 
 	} else { # read bases are all * --- represents a deletion
 			$seq .= 'N';

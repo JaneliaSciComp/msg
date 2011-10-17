@@ -34,6 +34,7 @@ my %params = (
 	      threads        => '8',
 	      theta        => '1',
           min_coverage => '2',
+          max_coverage_exceeded_state => 'N',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -91,6 +92,7 @@ if (exists $params{'parent1_reads'}) {
 	' --parent1 ' . $params{'parent1'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --min_coverage ' . $params{'min_coverage'} .
+	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .    
 	' --parent1-reads ' . $params{'parent1_reads'} .
 	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
@@ -117,6 +119,7 @@ if (exists $params{'parent2_reads'}) {
 	' --parent2 ' . $params{'parent2'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --min_coverage ' . $params{'min_coverage'} .
+	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .  
 	' --parent2-reads ' . $params{'parent2_reads'} .
 	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
