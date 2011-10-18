@@ -13,6 +13,12 @@ See compare_output.py for more information.
 
 """
 
+#Files that can change
+non_deterministic_file_name_endings = [
+    'matchMismatch.csv',
+    'hmmprob.RData',
+]
+
 paths_w_checksums = (
     ('/home/pinerog/msg_work/MSG_toy.run6.misc/hmm_data','c4746dfcbeba033fd60a9de4ca66c268'),
     ('/home/pinerog/msg_work/MSG_toy.run6.misc/hmm_fit','227e5a8f60ecac63bb0a2e905e8c914a'),

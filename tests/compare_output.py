@@ -44,21 +44,28 @@ def get_dir_md5(dir_root):
             filepath = os.path.join(dirpath, filename)
 
             # If some metadata is required, add it to the checksum
+            st = os.stat(filepath)
 
-            # 1) filename (good idea)
+            # 1) filename
             hash.update(os.path.normcase(os.path.relpath(filepath, dir_root)))
 
             # 2) mtime (possibly a bad idea)
-            # st = os.stat(filepath)
             # hash.update(struct.pack('d', st.st_mtime))
-
-            # 3) size (good idea perhaps)
-            # hash.update(bytes(st.st_size))
-
-            f = open(filepath, 'rb')
-            for chunk in iter(lambda: f.read(65536), b''):
-                hash.update(chunk)
-            f.close()
+            
+            # 3) size or content
+            is_non_det_file = any([filename.endswith(ending) for ending in 
+                checksums.non_deterministic_file_name_endings])
+            if is_non_det_file:
+                #just compare the file size
+                #print filename,"is nondeterministic, comparing size only"
+                hash.update(bytes(st.st_size))
+            else:
+                #compare content
+                #print filename,"comparing content"
+                f = open(filepath, 'rb')
+                for chunk in iter(lambda: f.read(65536), b''):
+                    hash.update(chunk)
+                f.close()
 
     return hash.hexdigest()
 
