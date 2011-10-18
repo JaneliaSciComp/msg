@@ -37,14 +37,20 @@ my %params = (
           max_coverage_exceeded_state => 'N',
     );
 
+sub strip {
+    # Remove leading and trailing whitespace
+    my ($val) = @_;
+    $val =~ s/^\s+//;
+    $val =~ s/\s+$//;
+    return $val;
+}
+
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
 while (<IN>) { chomp $_;
 	next if ($_ =~ /^\#/);
 	next unless ($_);
-   $_ =~ s/^\s+//;
-   $_ =~ s/\s+$//;
 	my ($key,$val) = split(/=/,$_);
-	$params{$key} = $val;
+	$params{strip($key)} = strip($val);
 } close IN;
 $params{'chroms2plot'} = $params{'chroms'} unless (defined $params{'chroms2plot'});
 my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of BWA threads when updating genomes (must match msg.pl)
