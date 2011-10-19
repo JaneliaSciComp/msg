@@ -58,7 +58,8 @@ def get_dir_md5(dir_root):
             if is_non_det_file:
                 #just compare the file size
                 #print filename,"is nondeterministic, comparing size only"
-                hash.update(bytes(st.st_size))
+                #hash.update(bytes(st.st_size))
+                pass #skip for now
             else:
                 #compare content
                 #print filename,"comparing content"
