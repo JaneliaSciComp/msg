@@ -82,8 +82,7 @@ sub sum_of_array {
 }
 
 sub get_std_deviation {
-    my ($values_ref) = @_;
-    my $mean = sum_of_array($values_ref) / scalar(@$values_ref);
+    my ($values_ref, $mean) = @_;
     my $total_for_var = 0;
     foreach my $val (@$values_ref) {
         $total_for_var += (($val - $mean)**2);
@@ -103,16 +102,16 @@ sub get_max_coverage {
     my @coverage_values;
 
     open(FILE,$pileup_file) || die "ERROR Can't open $pileup_file: $!\n";
-    while (<FILE>) { my $line = $_; chomp $line;;
+    while (<FILE>) { my $line = $_; chomp $line;
         #column 7 (0 based) is coverage
         my @t = split(/\s+/,$line);
         # Only look at reads with coverage
         if ($t[7] > 0) {
-            push (@coverage_values, $t[7]);
+            push (@coverage_values, int $t[7]);
         }
     } close FILE;
     my $mean = sum_of_array(\@coverage_values)/scalar(@coverage_values);
-    my $std = get_std_deviation(\@coverage_values);
+    my $std = get_std_deviation(\@coverage_values, $mean);
     $max_coverage = $mean + ($max_coverage_stds * $std);
     return sprintf "%.0f", $max_coverage; #round to int
 }
