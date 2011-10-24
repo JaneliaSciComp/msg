@@ -3,6 +3,8 @@
 ### Tina
 ### run msg on cetus
 use strict;
+use lib qw(./msg .);
+use Utils;
 
 print "\nMSG\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
@@ -37,20 +39,12 @@ my %params = (
           max_coverage_exceeded_state => 'N',
     );
 
-sub strip {
-    # Remove leading and trailing whitespace
-    my ($val) = @_;
-    $val =~ s/^\s+//;
-    $val =~ s/\s+$//;
-    return $val;
-}
-
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
 while (<IN>) { chomp $_;
 	next if ($_ =~ /^\#/);
 	next unless ($_);
 	my ($key,$val) = split(/=/,$_);
-	$params{strip($key)} = strip($val);
+	$params{Utils::strip($key)} = Utils::strip($val);
 } close IN;
 $params{'chroms2plot'} = $params{'chroms'} unless (defined $params{'chroms2plot'});
 my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of BWA threads when updating genomes (must match msg.pl)
@@ -259,11 +253,17 @@ if ($params{'cluster'} != 0) {
    #system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
    system("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -l excl=true -b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
    system("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
-   system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   #Run a simple validation
+   system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
+   #Cleanup - move output files to folders, remove barcode related files
+   system("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
    system("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    system("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
    system("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   #Run a simple validation
+   system("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
+   #Cleanup - move output files to folders, remove barcode related files
    system("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*");
 }
 
@@ -273,6 +273,7 @@ exit;
 
 ####################################################################################################
 ####################################################################################################
+
 sub readFasta {
     my ($file) = @_;
     
