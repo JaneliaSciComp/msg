@@ -155,9 +155,9 @@ system("chmod 755 msgRun1.sh");
 
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file
-chomp(my $tmp = `wc -l $params{'barcodes'}`); $tmp =~ s/^\s*//;
-my @tmp2 = split(/\s+/,$tmp);
-my $num_barcodes = shift @tmp2;
+my $num_barcodes = 0;
+open(FILE, $params{'barcodes'}) or die "can't open $params{'barcodes'}"; $num_barcodes++ while <FILE>;
+close(FILE);
 
 open (OUT,'>msgRun2.sh');
 
