@@ -156,8 +156,13 @@ system("chmod 755 msgRun1.sh");
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file
 my $num_barcodes = 0;
-open(FILE, $params{'barcodes'}) or die "can't open $params{'barcodes'}"; $num_barcodes++ while <FILE>;
-close(FILE);
+open(FILE,$params{'barcodes'}) || die "ERROR (msgCluster): Can't open $params{'barcodes'}: $!\n";
+while (<FILE>) { chomp $_;
+	     if ($_ =~ /^\S+\t.*$/) {
+            $num_barcodes ++;
+	     }
+} close FILE;
+print "num barcodes is! $num_barcodes";
 
 open (OUT,'>msgRun2.sh');
 
