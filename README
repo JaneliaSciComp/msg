@@ -19,9 +19,10 @@ cd msg
 make
 
 ### Toy Example ###
-The toy example is useful to check that MSG and dependencies are installed and functioning correctoy.
+The toy example is useful to check that MSG and dependencies are installed and functioning correctly.
 TODO
 
 ### Example with Real Data ###
 Download the data from NCBI's Sequence Read Archive and MSG config and barcodes file
  - example/get_sample_data.sh (requires wget)
+
