@@ -162,7 +162,6 @@ while (<FILE>) { chomp $_;
             $num_barcodes ++;
 	     }
 } close FILE;
-print "num barcodes is! $num_barcodes";
 
 open (OUT,'>msgRun2.sh');
 
