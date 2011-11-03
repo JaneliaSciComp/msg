@@ -7,13 +7,16 @@ from Bio.Alphabet import IUPAC
 import pysam
 from itertools import *
 import re, sys, os
+from collections import defaultdict
 from cmdline.cmdline import CommandLineApp
 from msglib import *
 import copy
 
+
 class App(CommandLineApp):
     def __init__(self):
         CommandLineApp.__init__(self)
+        #self.force_exit = False #enable this when profiling
         
         op = self.option_parser
         op.set_usage('usage: extract_ref_alleles -i indiv -d samdir -o outdir --parent1 parent1_genome --parent2 parent2_genome --chroms csv_list --verbosity')
@@ -37,15 +40,18 @@ class App(CommandLineApp):
                       help='chromosomes desired')
 
         op.add_option('--verbosity', action="store_true", dest='verbosity', default=False,
-                      help="make lots of noise [default]")
+                      help="make lots of noise")
 
 #        op.add_option("-q", "--quiet", action="store_false", dest="verbose",
 #                      help="be vewwy quiet (I'm hunting wabbits)")
 		  
-
+    @trace
     def main(self):
+        #Load in species reference genomes (one from each parent.)
         ref_seqs = dict(par1=SeqIO.to_dict(SeqIO.parse(open(self.options.parent1),"fasta")), par2=SeqIO.to_dict(SeqIO.parse(open(self.options.parent2),"fasta")))
 
+        #Manipulates files/paths to get at the barcoded reads for this individual
+        #e.g., /home/pinerog/msg_work/MSG_big/SRR071201.fastq_sam_files/aln_indivA1_AAATAG_par1.sam
         sim_samfilename = 'aln_' + self.options.indiv + '_par1.sam'
         sec_samfilename = 'aln_' + self.options.indiv + '_par2.sam'
         #sim_samfilename = 'aln_' + self.options.indiv + '_par1.sam.gz'
@@ -76,17 +82,24 @@ class App(CommandLineApp):
         sec_outfile = pysam.Samfile(os.path.join(self.options.outdir, sec_outfilename),
                                     'w', template=sec_samfile)
 
+        #initialize xxx_refs data structures to an empty dict
         print bcolors.OKBLUE + 'Opened SAM files for processing' + bcolors.ENDC;
-        sim_refs = dict(zip(sim_samfile.references, [{} for i in range(sim_samfile.nreferences)]))
-        sec_refs = dict(zip(sim_samfile.references, [{} for i in range(sim_samfile.nreferences)]))
-        refs = dict(par1=sim_refs, par2=sec_refs)
+        #set up sim ref and sec ref containers - use an empty dict when a key is missing
+        #refs, are orths are the only large things kept in memory
+        refs = dict(par1=defaultdict(dict), par2=defaultdict(dict))
         orths = copy.deepcopy(refs)
 
+        #Warning: this only iterates to the shortest of the combined lists
         both_samfiles = izip(sim_samfile.fetch(), sec_samfile.fetch())
 
         species = ['par1','par2']
         refsp = ['par1','par2'] ## species for which reference allele information is being extracted from MD
         self.options.chroms = self.options.chroms.split(',')
+
+        #Optimization: Store these values once instead of re-calc each use
+        chroms = self.options.chroms
+        verbosity = self.options.verbosity
+        omit_flags = set([0,16])
 
         print('Filtering reads and extracting %s reference allele information' % refsp)
         print(sim_samfilename)
@@ -95,23 +108,29 @@ class App(CommandLineApp):
 
         i = 0
         read = {}
+        #Go through each reference, keeping only those that match and are valid
         for (read['par1'], read['par2']) in both_samfiles:
             if not i % 1e5: print i
             i += 1
-  
-            ref = sim_samfile.references[read['par1'].rname]
-            par2ref = dict(par1=sim_samfile.references[read['par1'].rname],par2=sec_samfile.references[read['par2'].rname])
+            #Optimization: Store these values once instead of re-calc each use
+            par1_rname = read['par1'].rname
+            par2_rname = read['par2'].rname
+            par1_flag = read['par1'].flag
+            par2_flag = read['par2'].flag            
 
-            if self.options.chroms != ['all'] and ref not in self.options.chroms: continue
+            ref = sim_samfile.references[par1_rname]
+            par2ref = dict(par1=sim_samfile.references[par1_rname],par2=sec_samfile.references[par2_rname])
 
-            if not (read['par1'].flag in [0,16] and read['par2'].flag in [0,16]):
-                if self.options.verbosity: print 'read %d %s flags (parent1: %d, parent2: %d) not in {0,16}: omitting' % (
-                    i, read['par1'].qname, read['par1'].flag, read['par2'].flag)
+            if chroms != ['all'] and ref not in chroms: continue
+
+            if not (par1_flag in omit_flags and par2_flag in omit_flags):
+                if verbosity: print 'read %d %s flags (parent1: %d, parent2: %d) not in {0,16}: omitting' % (
+                    i, read['par1'].qname, par1_flag, par2_flag)
                 continue
-            if read['par1'].flag == 4 or read['par2'].flag == 4: continue
+            if par1_flag == 4 or par2_flag == 4: continue
 
             seq_forward = dict(zip(species, [Seq(read[sp].seq, IUPAC.ambiguous_dna) for sp in species]))
-            if read['par2'].flag != read['par1'].flag:
+            if par2_flag != par1_flag:
                 seq_forward['par2'] = seq_forward['par2'].reverse_complement()
         
             if str(seq_forward[sp]) != str(seq_forward[sp]):
@@ -141,6 +160,7 @@ class App(CommandLineApp):
                 sim_outfile.write(read['par1'])
                 sec_outfile.write(read['par2'])
 
+                #Fill in the refs and orths dicts
                 record_reference_alleles(
 							 refs['par1'][ref], refs['par2'][ref], 
 							 orths['par1'][ref], orths['par2'][ref], 
@@ -148,30 +168,26 @@ class App(CommandLineApp):
 							 seq_forward['par1'], 
 							 ref_seqs['par1'][par2ref['par1']].seq, ref_seqs['par2'][par2ref['par2']].seq, 
 							 par2ref['par1'], par2ref['par2'], 
-							 self.options.verbosity)
-
-#                for sp in refsp:
-#                    record_reference_alleles(refs[sp][ref], orths[sp][ref], read['par1'], read[sp], seq_forward[sp], ref_seqs[sp][par2ref[sp]].seq, par2ref[sp], self.options.verbosity)
+							 verbosity)
   
         print '\n'
-        
         refsdir = os.path.join(self.options.outdir, 'refs')
         if not os.path.exists(refsdir): os.mkdir(refsdir)
         for sp in refsp:
             outdir = os.path.join(refsdir, sp)
             if not os.path.exists(outdir): os.mkdir(outdir)
-
+            
             for ref in refs[sp].keys():
-                d = refs[sp][ref] 
+                d = refs[sp][ref]
                 if len(d) == 0: continue
-                refs[sp][ref] = sorted(zip(d.keys(), d.values()))
+                refs[sp][ref] = sorted(d.items())
                 refs[sp][ref] = ["\t".join(map(str, kv)) for kv in refs[sp][ref]]
                 alleles_outfile = open(os.path.join(outdir, ref + '-ref.alleles'), 'w')
                 alleles_outfile.write('\n'.join(refs[sp][ref]))
                 alleles_outfile.write('\n')
-
+                
                 d = orths[sp][ref] 
-                orths[sp][ref] = sorted(zip(d.keys(), d.values()))
+                orths[sp][ref] = sorted(d.items())
                 orths[sp][ref] = ["\t".join(map(str, kv)) for kv in orths[sp][ref]]
                 orths_outfile = open(os.path.join(outdir, ref + '-orths.alleles'), 'w')
                 orths_outfile.write('\n'.join(orths[sp][ref]))
@@ -196,20 +212,22 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
     cigar_ops = read.cigar
     cigar_ops_sim = sim_read.cigar
 
-    if verbosity: print "\n\n" + "*" * 100 + "\n" + str(sim_read.qname) + "\n" + "*" * 100 + "\n"
-    if verbosity: print "*** SIM_READ ***"
-    if verbosity: print sim_read.cigar
-    if verbosity: print cigar_ops_sim
-    if verbosity: print "*** READ ***"
-    if verbosity: print read.cigar
-    if verbosity: print cigar_ops
-    if verbosity: print "\n*** READ INFO ***\nORIG ref_pos %d" % ref_pos
+    if verbosity: 
+        print "\n\n" + "*" * 100 + "\n" + str(sim_read.qname) + "\n" + "*" * 100 + "\n"
+        print "*** SIM_READ ***"
+        print sim_read.cigar
+        print cigar_ops_sim
+        print "*** READ ***"
+        print read.cigar
+        print cigar_ops
+        print "\n*** READ INFO ***\nORIG ref_pos %d" % ref_pos
 
     if revComp_flag==1: 
-        if verbosity: print "reversing order"
-        if verbosity: print cigar_ops
+        if verbosity: 
+            print "reversing order"
+            print cigar_ops
         cigar_ops = tuple(reversed(read.cigar))
-#        cigar_ops_sim = tuple(reversed(sim_read.cigar))
+        #cigar_ops_sim = tuple(reversed(sim_read.cigar))
         if verbosity: print cigar_ops
 
         for (op, op_len) in cigar_ops:
@@ -245,44 +263,53 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
     index_sim = 0
     index_ref = 0
     report_diff = 0
-    reconstruct_ref1 = ''
-    reconstruct_ref2 = ''
+    #Operations to reconstruct_ref1 and reconstruct_ref2 have been commented out for 
+    #performance.  If you want to debug you should be able to uncomment them.
+    #Some "if verbosity: print..." statements have also been commented out for
+    #performance.  If you want to debug you should be able to uncomment them.
+    #reconstruct_ref1 = ''
+    #reconstruct_ref2 = ''
 
-    while index_sim < len(str(sim_ref_seq)):
+    #Optimization: Store these values once instead of reconverting on each use
+    str_sim_ref_seq = str(sim_ref_seq)
+    str_ref_seq = str(ref_seq)
+    len_str_sim_ref_seq = len(str_sim_ref_seq)
 
-        while str(sim_ref_seq[index_sim]) == "_" and not str(ref_seq[index_ref]) == "_":
+    while index_sim < len_str_sim_ref_seq:
+
+        while str_sim_ref_seq[index_sim] == "_" and not str_ref_seq[index_ref] == "_":
             index_sim += 1
             pos += 1
-            reconstruct_ref1 += "."
-            reconstruct_ref2 += "."
-            if verbosity: print "   \t----- (1 sim %s ref %s) updating index_ref %d and ref_pos %d" % (str(sim_ref_seq[index_sim]),str(ref_seq[index_ref]),index_sim,pos)
+            #reconstruct_ref1 += "."
+            #reconstruct_ref2 += "."
+            #if verbosity: print "   \t----- (1 sim %s ref %s) updating index_ref %d and ref_pos %d" % (str(sim_ref_seq[index_sim]),str(ref_seq[index_ref]),index_sim,pos)
 
-        while str(ref_seq[index_ref]) == "_" and not str(sim_ref_seq[index_sim]) == "_":
+        while str_ref_seq[index_ref] == "_" and not str_sim_ref_seq[index_sim] == "_":
             index_ref += 1
             if revComp_flag==1: ref_pos -= 1
             else: ref_pos += 1
-            reconstruct_ref1 += "."
-            reconstruct_ref2 += "."
-            if verbosity: print "   \t----- (2 sim %s ref %s) updating index_sim %d and pos %d" % (str(sim_ref_seq[index_sim]),str(ref_seq[index_ref]),index_ref,ref_pos)
+            #reconstruct_ref1 += "."
+            #reconstruct_ref2 += "."
+            #if verbosity: print "   \t----- (2 sim %s ref %s) updating index_sim %d and pos %d" % (str(sim_ref_seq[index_sim]),str(ref_seq[index_ref]),index_ref,ref_pos)
 
 
-        if str(sim_ref_seq[index_sim]) == "_" and str(ref_seq[index_ref]) == "-":
+        if str_sim_ref_seq[index_sim] == "_" and str_ref_seq[index_ref] == "-":
             index_ref += 1
             pos += 1
-            if verbosity: print "   \t----- (1*) updating index_ref %d and pos %d" % (index_ref,pos)
+            #if verbosity: print "   \t----- (1*) updating index_ref %d and pos %d" % (index_ref,pos)
         
-        elif str(ref_seq[index_ref]) == "_" and str(sim_ref_seq[index_sim]) == "-": 
+        elif str_ref_seq[index_ref] == "_" and str_sim_ref_seq[index_sim] == "-": 
             index_sim += 1
-            if str(ref_seq[index_ref]) != "-":
+            if str_ref_seq[index_ref] != "-":
                 if revComp_flag==1: ref_pos -= 1
                 else: ref_pos += 1
-            if verbosity: print "   \t----- (2*) updating index_sim %d and ref_pos %d" % (index_sim,ref_pos)
+            #if verbosity: print "   \t----- (2*) updating index_sim %d and ref_pos %d" % (index_sim,ref_pos)
 
 
         #print "\tsim %d %d: %s\tsec %d %d: %s" % (pos,index_sim,sim_ref_seq[index_sim],ref_pos,index_ref,ref_seq[index_ref])
         #if sim_ref_seq[index_sim] != ref_seq[index_ref]: print "***" 
 
-        if (not str(sim_ref_seq[index_sim]) in ("_","-")) and (not str(ref_seq[index_ref]) in ("_","-")):
+        if (not str_sim_ref_seq[index_sim] in ("_","-")) and (not str_ref_seq[index_ref] in ("_","-")):
 
             alleles_par1[pos] = par1_ref_seq[pos-1:pos]
             orths_par1[pos] = contig + "\t" + str(pos) + "\t0" + "\t" + str(alleles_par1[pos])
@@ -291,24 +318,25 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
             if revComp_flag: alleles_par2[pos] = par2_ref_seq[ref_pos-1:ref_pos].complement()
             orths_par2[pos] = scaffold + "\t" + str(ref_pos) + "\t" + str(revComp_flag) + "\t" + str(alleles_par2[pos])
 
-            reconstruct_ref1 += alleles_par1[pos]
-            reconstruct_ref2 += alleles_par2[pos]
+            #reconstruct_ref1 += alleles_par1[pos]
+            #reconstruct_ref2 += alleles_par2[pos]
 
-        else: 
-            reconstruct_ref1 += "."
-            reconstruct_ref2 += "."
+        else:
+            pass 
+            #reconstruct_ref1 += "."
+            #reconstruct_ref2 += "."
 
-        if str(sim_ref_seq[index_sim]) != "-":
+        if str_sim_ref_seq[index_sim] != "-":
             pos += 1
 
-        if str(ref_seq[index_ref]) != "-":
+        if str_ref_seq[index_ref] != "-":
             if revComp_flag==1: ref_pos -= 1
             else: ref_pos += 1
 
         index_sim += 1
         index_ref += 1
 
-    if verbosity: print "\n*** RECONSTRUCTED ***\n      read  %s\nsim_refseq  %s\n    refseq  %s\n    recons1 %s\n    recons2 %s" % (read_like_sec,sim_ref_seq,ref_seq,reconstruct_ref1,reconstruct_ref2)
+    #if verbosity: print "\n*** RECONSTRUCTED ***\n      read  %s\nsim_refseq  %s\n    refseq  %s\n    recons1 %s\n    recons2 %s" % (read_like_sec,sim_ref_seq,ref_seq,reconstruct_ref1,reconstruct_ref2)
 
 
 ####################################################################################################
@@ -350,10 +378,27 @@ def updateRefRead(read_id, read_cigar_ops, seq_forward, revComp_flag, verbosity,
 
 
 if __name__ == '__main__':
+    '''
+    #Python Profiling code: (set force_exit to false in __init__ above)
+    #Uncomment the code below and comment out the normal call to App.run()
+    import hotshot, hotshot.stats
+    prof = hotshot.Profile("index.prof")
+    prof.runcall(App().run)
+    prof.close()
+    stats = hotshot.stats.load("index.prof")
+    #stats.strip_dirs()
+    stats.sort_stats('time', 'calls')
+    stats.print_stats()
+    print '-------Callers------'
+    stats.print_callers()
+    print '------Callees-------'
+    stats.print_callees() #redundant?
+    '''
     try:
         App().run()
     except Exception, e:
         print bcolors.FAIL + 'ERROR in extract-ref-alleles:\n' + bcolors.ENDC
         print '%s' % e
         sys.exit(2)
+    #'''
 # block-25 ends here
