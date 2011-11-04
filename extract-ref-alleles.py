@@ -42,8 +42,8 @@ class App(CommandLineApp):
 
         #I suggest not using this first since it is faster, and using limitmem if
         #you notice you're running out of RAM and hitting swap
-        op.add_option('--limitmem', action="store_true", dest='limit_memory', default=False, 
-                      help='limit memory usage to size of largest ref/orth file created or 3GB-ish whichever is greater.')
+        op.add_option('--limitmem', type='int', dest='limit_memory', default=0, 
+                      help='if 1, limit memory usage to size of largest ref/orth file created or 3GB-ish whichever is greater. If 0, optimize for speed.')
 
         op.add_option('--verbosity', action="store_true", dest='verbosity', default=False,
                       help="make lots of noise")
@@ -58,6 +58,8 @@ class App(CommandLineApp):
             shutil.rmtree(self.refsdir)
             assert not os.path.exists(self.refsdir)
         os.mkdir(self.refsdir)
+
+        print "Using limited memory mode: ", bool(self.options.limit_memory)
 
         if not self.options.limit_memory:
             #Disabling garbage collection seemed to take about 7% off of the run time
@@ -204,7 +206,6 @@ class App(CommandLineApp):
         if limit_memory:
             #Write out any remaining refs/orths
             self.store_alleles_orths(refsp, refs, orths, False)
-            print "starting sort"
             #load back in the files and finalize them (sort/dedupe)
             self.sort_and_dedupe_ref_orth_files(refsp)
         else:

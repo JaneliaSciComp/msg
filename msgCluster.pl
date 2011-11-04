@@ -37,6 +37,7 @@ my %params = (
 	      theta        => '1',
           min_coverage => '2',
           max_coverage_exceeded_state => 'N',
+          limit_memory => '0',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -189,6 +190,7 @@ if ($params{'cluster'} != 0) {
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
        ' --theta ' . $params{'theta'} .
+       ' --limit_memory ' . $params{'limit_memory'} .
        " || exit 100\ndone\n" .
        "/bin/date\n";
 } else {
@@ -208,6 +210,7 @@ if ($params{'cluster'} != 0) {
        ' --rfac ' . $params{'rfac'} .
        ' --priors ' . $params{'priors'} .
        ' --theta ' . $params{'theta'} .
+       ' --limit_memory ' . $params{'limit_memory'} .
        "\n";
     }
 close OUT;
