@@ -39,8 +39,7 @@ GetOptions(
 	'rfac=s' => \$rfac,
 	'bwaindex1=s' => \$bwaindex1,
 	'bwaindex2=s' => \$bwaindex2,
-	'theta=s' => \$theta,
-    'limit_memory=s' => \$limit_memory
+	'theta=s' => \$theta
 	) ;
 
 print "msg version:  $version\n" ;
@@ -54,7 +53,6 @@ print "chroms:         $chroms\n\n" ;
 print "sexchroms:      $sexchroms\n\n" ;
 print "max_coverage_stds $max_coverage_stds\n\n";
 print "max_coverage_exceeded_state $max_coverage_exceeded_state\n\n";
-print "limit_memory $limit_memory\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -219,8 +217,7 @@ if ($parse_or_map eq '--map-only') {
    			 '-r', $rfac,
    			 '-x', $sexchroms,
    			 '-z', $priors,
-   			 '-t', $theta,
-             '-m', $limit_memory
+   			 '-t', $theta
    		  ) ;
 
    } close BARCODE;

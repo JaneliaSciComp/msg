@@ -61,3 +61,17 @@ def sort_unique(file_path):
     outfile.write('\n')                    
     outfile.close()
 
+def get_free_memory():
+    """
+    Try to figure out how much memory is free on a Unix system.
+    Returns free memory in mB.
+    """ 
+    data = open("/proc/meminfo", 'rt').readlines()
+    free = 0
+    for line in data:
+        if line.startswith("MemFree") or line.startswith("Buffers") or line.startswith("Cached"):
+            items = line.split()
+            free += int(items[1])
+    #print "free memory is",free/1000,"mB"
+    return free/1000
+

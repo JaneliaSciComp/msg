@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # [[file:~/Work/simsec/org/simsec.org::*Filter%20reads][block-25]]
+import gc
 from Bio.Seq import Seq
 from Bio import SeqIO
 from Bio.Alphabet import IUPAC
@@ -13,6 +14,9 @@ from msglib import *
 import copy
 import shutil
 
+#How much memory to keep free in mB.  This leaves some buffer in case other
+#jobs get allocated to the same node while this program is running.
+KEEP_MEM_FREE_AMT = 800
 
 class App(CommandLineApp):
     def __init__(self):
@@ -40,16 +44,15 @@ class App(CommandLineApp):
         op.add_option('--chroms', dest='chroms', type='string', default=None, 
                       help='chromosomes desired')
 
-        #I suggest not using this first since it is faster, and using limitmem if
-        #you notice you're running out of RAM and hitting swap
-        op.add_option('--limitmem', type='int', dest='limit_memory', default=0, 
-                      help='if 1, limit memory usage to size of largest ref/orth file created or 3GB-ish whichever is greater. If 0, optimize for speed.')
-
         op.add_option('--verbosity', action="store_true", dest='verbosity', default=False,
                       help="make lots of noise")
 	  
     @trace
     def main(self):
+
+        print "\n",get_free_memory(), "mB of free memory at program start"
+        print "(Keeping %s mB of memory in reserve for other programs)" % KEEP_MEM_FREE_AMT
+
         #Clear out refs dir if it exists, create it if it doesn't
         #(It's important to delete any existing files because we open them to write
         #in append mode)
@@ -59,17 +62,9 @@ class App(CommandLineApp):
             assert not os.path.exists(self.refsdir)
         os.mkdir(self.refsdir)
 
-        print "Using limited memory mode: ", bool(self.options.limit_memory)
-
-        if not self.options.limit_memory:
-            #Disabling garbage collection seemed to take about 7% off of the run time
-            #in my testing.
-            #Since no large variables are de-referenced or go out of scope anyway
-            #there's really no harm to disabling it when not in limit memory mode.
-            #(In limit_memory mode we do delete references so we do require 
-            #garbage collection.)
-            import gc
-            gc.disable()
+        #Disabling garbage collection seemed to take about 7% off of the run time
+        #in my testing.
+        gc.disable()
 
         #Load in species reference genomes (one from each parent.)
         ref_seqs = dict(par1=SeqIO.to_dict(SeqIO.parse(open(self.options.parent1),"fasta")), par2=SeqIO.to_dict(SeqIO.parse(open(self.options.parent2),"fasta")))
@@ -124,7 +119,8 @@ class App(CommandLineApp):
         chroms = self.options.chroms
         verbosity = self.options.verbosity
         omit_flags = set([0,16])
-        limit_memory = self.options.limit_memory
+        memory_reserve = KEEP_MEM_FREE_AMT
+        need_sort_and_dedupe = False
 
         print('Filtering reads and extracting %s reference allele information' % refsp)
         print(sim_samfilename)
@@ -195,23 +191,27 @@ class App(CommandLineApp):
 							 par2ref['par1'], par2ref['par2'], 
 							 verbosity)
   
-            if (not i % 1e4) and limit_memory:
-                #When running in low memory mode, take a break every 1e4 references
-                #and offload references calculated so far to the output files
-                #so we can clear them from memory.  We'll sort and dedupe them 
-                #at the end.
-                self.store_alleles_orths(refsp, refs, orths, False)
-
+            if (not i % 1e4):
+                print "At ref num %s. free memory is %s mB" % (i, get_free_memory()) #!!
+                if (get_free_memory() < memory_reserve):
+                    #Every 1e4 references check if we are low on memory and if so
+                    #offload references calculated so far to the output files
+                    #so we can clear them from memory.  We'll sort and dedupe them 
+                    #at the end.
+                    print "No free memory left: %s mB (%s mB is being kept in reserve)." % (get_free_memory(),memory_reserve)
+                    print "Offloading refs/orths to files to limit further memory usage."
+                    need_sort_and_dedupe = True
+                    self.store_and_remove_alleles_orths(refsp, refs, orths, False)
         print '\n'
-        if limit_memory:
+        if need_sort_and_dedupe:
             #Write out any remaining refs/orths
-            self.store_alleles_orths(refsp, refs, orths, False)
+            self.store_and_remove_alleles_orths(refsp, refs, orths, False)
             #load back in the files and finalize them (sort/dedupe)
             self.sort_and_dedupe_ref_orth_files(refsp)
         else:
             #Just store the files once at the end of the run.
             #The will be finalized before being written
-            self.store_alleles_orths(refsp, refs, orths, True)
+            self.store_and_remove_alleles_orths(refsp, refs, orths, True)
 
     @trace
     def sort_and_dedupe_ref_orth_files(self, refsp):
@@ -224,7 +224,7 @@ class App(CommandLineApp):
         """
         #If you want a speedup here in the future, each of these sorting jobs
         #could be run by qsub.  They are completely independant.
-        #The only issue is that this program could already
+        #The only issue is that extract-ref-alleles.py could already
         #be called by qsub 400+ times at once, so if each instance if also calling 
         #100's of qsubs, that might be a problem?
         for sp in refsp:
@@ -234,7 +234,7 @@ class App(CommandLineApp):
                 sort_unique(fp)
 
         '''
-        Misc optimization attempts (included so no-one wastes time repeating these):
+        Misc optimization attempts (I'm leaving these in, commented out, so no-one wastes time repeating these):
 
         #Testing w multiprocessing - used 1GB for each new python process :-( and 
         #seeminly no faster
@@ -260,7 +260,7 @@ class App(CommandLineApp):
         '''
     
     @trace
-    def store_alleles_orths(self, refsp, refs, orths, do_finalize_files):
+    def store_and_remove_alleles_orths(self, refsp, refs, orths, do_finalize_files):
         """
         Write out the alleles and orths stored in refs and orths.
         We append to the files to handle cases where there is more than one ref/position.
@@ -303,6 +303,7 @@ class App(CommandLineApp):
                 orths_outfile.write('\n'.join(kv_items))
                 orths_outfile.write('\n')
                 del orths[sp][ref]
+        gc.collect()
 
 def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2, sim_read, read, seq_forward, par1_ref_seq, par2_ref_seq, contig, scaffold, verbosity):
     '''Store reference alleles implied by read's MD field. ref_alleles
