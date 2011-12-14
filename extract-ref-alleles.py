@@ -192,7 +192,7 @@ class App(CommandLineApp):
 							 verbosity)
   
             if (not i % 1e4):
-                print "At ref num %s. free memory is %s mB" % (i, get_free_memory()) #!!
+                #print "At ref num %s. free memory is %s mB" % (i, get_free_memory())
                 if (get_free_memory() < memory_reserve):
                     #Every 1e4 references check if we are low on memory and if so
                     #offload references calculated so far to the output files
