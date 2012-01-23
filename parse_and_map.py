@@ -145,7 +145,7 @@ class ParseAndMap(CommandLineApp):
     ##    -c convert individual fastq files into fasta [0]
     
         raw_data = self.options.raw_data_file
-        args = ["perl", os.path.join(sys.path[0], "parse_BCdata2BWA.pl"), 
+        args = ["perl", os.path.join(os.path.dirname(__file__), "parse_BCdata2BWA.pl"), 
                   '-b', self.options.barcodes_file,
                   '-e', self.options.re_cutter,
                   '-l', self.options.linker_system,
