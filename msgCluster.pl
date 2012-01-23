@@ -36,7 +36,7 @@ my %params = (
 	      threads        => '8',
 	      theta        => '1',
           min_coverage => '2',
-          max_coverage_exceeded_state => 'N',
+          max_coverage_exceeded_state => 'N'
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -162,6 +162,8 @@ while (<FILE>) { chomp $_;
             $num_barcodes ++;
 	     }
 } close FILE;
+
+print "num barcodes is $num_barcodes!\n";
 
 open (OUT,'>msgRun2.sh');
 
