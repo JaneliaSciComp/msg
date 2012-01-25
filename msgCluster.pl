@@ -36,7 +36,9 @@ my %params = (
 	      threads        => '8',
 	      theta        => '1',
           min_coverage => '2',
-          max_coverage_exceeded_state => 'N'
+          max_coverage_exceeded_state => 'N',
+          addl_qsub_option_for_exclusive_node => '',
+          addl_qsub_option_for_pe => ''
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -46,9 +48,25 @@ while (<IN>) { chomp $_;
 	my ($key,$val) = split(/=/,$_);
 	$params{Utils::strip($key)} = Utils::strip($val);
 } close IN;
+
+### Configure some parameters ###
 $params{'chroms2plot'} = $params{'chroms'} unless (defined $params{'chroms2plot'});
 my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of BWA threads when updating genomes (must match msg.pl)
-
+#add space after qsub options so we can insert into commands, add thread/slot count to -pe option
+if (defined $params{'addl_qsub_option_for_exclusive_node'} && $params{'addl_qsub_option_for_exclusive_node'}) {
+    #example: go from user msg.cfg entered "-l excl=true" to "-l excl=true "
+    $params{'addl_qsub_option_for_exclusive_node'} = $params{'addl_qsub_option_for_exclusive_node'}.' ';
+}
+else {
+    $params{'addl_qsub_option_for_exclusive_node'} = '';
+}
+if (defined $params{'addl_qsub_option_for_pe'} && $params{'addl_qsub_option_for_pe'}) {
+    #example: go from user msg.cfg entered "-pe batch" to "-pe batch 8 "
+    $params{'addl_qsub_option_for_pe'} = $params{'addl_qsub_option_for_pe'}." $update_nthreads ";
+}
+else {
+    $params{'addl_qsub_option_for_pe'} = '';
+}
 
 ### check if all files exist
 foreach my $param (qw( barcodes reads parent1 parent2 parent1_reads parent2_reads )) {
@@ -222,8 +240,8 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 ### Run jobs!
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$  -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-1.sh") ;
-      system("qsub -N msgRun0-2.$$  -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun0-1.$$  $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun0-2.$$  $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -233,7 +251,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent1_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$ -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -242,7 +260,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-2.$$ -pe batch $update_nthreads -cwd -l excl=true -b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
@@ -255,9 +273,9 @@ else {
 }
 
 if ($params{'cluster'} != 0) {
-   system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -l excl=true -b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
+   system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
    #system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
-   system("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd -l excl=true -b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   system("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
    system("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
    system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
