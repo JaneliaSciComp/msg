@@ -16,8 +16,8 @@ $update_nthreads = 8 ; ## Number of BWA threads when updating genomes (must matc
 
 GetOptions(
 	'barcodes|b=s' => \$barcodes,
-   're_cutter=s' => \$re_cutter,
-   'linker_system=s' => \$linker_system,
+	're_cutter=s' => \$re_cutter,
+	'linker_system=s' => \$linker_system,
 	'reads|i=s' => \$raw_read_data,
 	'update|u' => \$update_genomes,
 	'parent1=s' => \$parent1_genome,
@@ -116,7 +116,7 @@ if( $update_genomes ) {
 
 			&system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
 				unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-			&system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
+			&system_call("$src/samtools", "faidx", "$genomes_fa{$sp}.msg") ;
 
 			unless (-e "$out.sam") {
 				&system_call("bwa", "aln", "-t", $update_nthreads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
@@ -125,10 +125,10 @@ if( $update_genomes ) {
 
 			&system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam") ;
 
-			&system_call("samtools", "view", "-bt", "$genomes{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
-			&system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
-			&system_call("samtools", "index", "$out.bam.sorted.bam") ;
-			&system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
+			&system_call("$src/samtools", "view", "-bt", "$genomes{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
+			&system_call("$src/samtools", "sort", "$out.bam", "$out.bam.sorted") ;
+			&system_call("$src/samtools", "index", "$out.bam.sorted.bam") ;
+			&system_call("$src/samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
 
 		}
 

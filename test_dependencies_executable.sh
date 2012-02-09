@@ -20,8 +20,8 @@ if ! which bwa >/dev/null 2>/dev/null ; then
 	exit 1
 fi
 
-if ! which samtools >/dev/null 2>/dev/null ; then
-	echo "Please install samtools somewhere in your PATH"
+if ! [ -e $(dirname $0)/samtools ] ; then
+    echo "Please install samtools (version 0.1.9) within the msg directory"
 	exit 1
 fi
 
