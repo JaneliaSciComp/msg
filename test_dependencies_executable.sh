@@ -20,9 +20,15 @@ if ! which bwa >/dev/null 2>/dev/null ; then
 	exit 1
 fi
 
+samtools_required_version="Version: 0.1.9 (r783)"
 if ! [ -e $(dirname $0)/samtools ] ; then
-    echo "Please install samtools (version 0.1.9) within the msg directory"
-	exit 1
+        echo "Please install samtools ($samtools_required_version) within the msg directory"
+	    exit 1
+fi
+samtools_version=`$(dirname $0)/samtools 2>&1 | grep 'Version:'`
+if [ "$samtools_version" != "$samtools_required_version" ] ; then
+    echo "The samtools found within the msg directory is $samtools_version.  It must be $samtools_required_version" 
+    exit 1
 fi
 
 echo "All required executables found in PATH"
