@@ -17,6 +17,8 @@ true=0
 false="false"
 
 all=$false
+script_dir=$(dirname $0)
+
 
 while getopts "ai:d:p:q:" opt
 do 
@@ -44,19 +46,19 @@ species=par1
 file=$dir/aln_${indiv}_${species}-filtered
 echo "$file"
 
-[ -e $parent1.fai ] || samtools faidx $parent1
+[ -e $parent1.fai ] || $script_dir/samtools faidx $parent1
 [ -e $file-sorted.bam ] || {
     echo "samtools view -bt $parent1.fai $file.sam | samtools sort - $file-sorted"
-    samtools view -bt $parent1.fai $file.sam | samtools sort - $file-sorted
+    $script_dir/samtools view -bt $parent1.fai $file.sam | $script_dir/samtools sort - $file-sorted
 }
-[ -e $file-sorted.bam.bai ] || samtools index $file-sorted.bam
+[ -e $file-sorted.bam.bai ] || $script_dir/samtools index $file-sorted.bam
 
 for ref in $refs ; do
     [ -e $file-$ref-sorted.pileup ] || {
         echo "Making pileup for $species contig $ref"
-        samtools view -bu $file-sorted.bam $ref | samtools sort - $file-$ref-sorted
-        samtools index $file-$ref-sorted.bam
-        samtools pileup -cf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
+        $script_dir/samtools view -bu $file-sorted.bam $ref | samtools sort - $file-$ref-sorted
+        $script_dir/samtools index $file-$ref-sorted.bam
+        $script_dir/samtools pileup -cf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
         rm $file-$ref-sorted.bam $file-$ref-sorted.bam.bai
     }
 done
