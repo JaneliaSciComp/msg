@@ -12,8 +12,11 @@ class SamFilter(CommandLineApp):
                       help='Input .sam file')
         op.add_option('-o', '--outfile', dest='outfile', type='string', default=None, 
                       help='Output .sam file')
+        op.add_option('-a', '--bwa_alg', dest='bwa_alg', type='string', default='', 
+                      help='Output .sam file')
 
     def main(self):
+        bwa_alg = self.options.bwa_alg
         infile = pysam.Samfile(self.options.infile, 'r')
         outfile = pysam.Samfile(self.options.outfile, 'wh', template=infile)
         #outfile = pysam.Samfile(self.options.outfile, 'w', template=infile)
@@ -30,11 +33,16 @@ class SamFilter(CommandLineApp):
             if read.flag == 4: continue
         
             try:
-                one_best_match = read.opt('X0') == 1
-                no_subpoptimal_matches = read.opt('X1') == 0
-                indels = read.opt('XO') > 0 or read.opt('XG') > 0 
+                if bwa_alg == 'bwasw':
+                    #The SAM files output by the bwasw algorithm don't include the X0 or X1 tags
+                    #They do seem to include at least AS,XN,XS,XF,XE if we want to filter by those later.
+                    ok = True
+                else:
+                    one_best_match = read.opt('X0') == 1
+                    no_subpoptimal_matches = read.opt('X1') == 0
+                    #indels = read.opt('XO') > 0 or read.opt('XG') > 0 
 
-                ok = one_best_match and no_subpoptimal_matches ## and not indels
+                    ok = one_best_match and no_subpoptimal_matches ## and not indels
 
             except Exception, e: ## KeyError
                 print '%s' % e

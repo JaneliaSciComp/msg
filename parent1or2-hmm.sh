@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 usage () {
-    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms
+    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms -w bwaalg
     exit 2
 }
 
@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:r:t:h:" opt
+while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:r:t:h:w:" opt
 do 
   case $opt in
       b) barcodes=$OPTARG ;;
@@ -30,6 +30,7 @@ do
       z) priors=$OPTARG ;;
       r) rfac=$OPTARG ;;
       t) theta=$OPTARG ;;
+      w) bwaalg=$OPTARG ;;
       *) usage ;;
   esac
 done
@@ -61,8 +62,8 @@ indivdir=$outdir/$indiv
     [ -e $indivdir/aln_${indiv}_par2-filtered.sam ] || [ -e $indivdir/aln_${indiv}_par2-filtered.sam.gz ] || {
 
     echo "Extracting reference allele information from SAM files for $indiv ($parent1 and $parent2)"
-    echo "python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms"
-    python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms || {
+    echo "python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg"
+    python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg || {
         echo "Error during extract-ref-alleles.py for $indiv"
     }
 }

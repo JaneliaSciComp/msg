@@ -12,7 +12,6 @@ sub system_call {
 
 $src = dirname $0 ;
 $update_genomes = $false ;
-$update_nthreads = 8 ; ## Number of BWA threads when updating genomes (must match msgCluster.pl)
 
 GetOptions(
 	'barcodes|b=s' => \$barcodes,
@@ -28,7 +27,6 @@ GetOptions(
 	'min_coverage=i' => \$min_coverage,
 	'max_coverage_stds=i' => \$max_coverage_stds,
     'max_coverage_exceeded_state=s' => \$max_coverage_exceeded_state,
-	'threads|t=i' => \$update_nthreads,
 	'parse_or_map=s' => \$parse_or_map,
 	'priors=s' => \$priors,
 	'chroms=s' => \$chroms,
@@ -39,7 +37,9 @@ GetOptions(
 	'rfac=s' => \$rfac,
 	'bwaindex1=s' => \$bwaindex1,
 	'bwaindex2=s' => \$bwaindex2,
-	'theta=s' => \$theta
+	'theta=s' => \$theta,
+    'bwa_alg=s' => \$bwa_alg,
+    'bwa_threads=i' => \$bwa_threads
 	) ;
 
 print "msg version:  $version\n" ;
@@ -53,6 +53,10 @@ print "chroms:         $chroms\n\n" ;
 print "sexchroms:      $sexchroms\n\n" ;
 print "max_coverage_stds $max_coverage_stds\n\n";
 print "max_coverage_exceeded_state $max_coverage_exceeded_state\n\n";
+print "bwaindex1 $bwaindex1\n\n";
+print "bwaindex2 $bwaindex2\n\n";
+print "bwa_alg $bwa_alg\n\n";
+print "bwa_threads $bwa_threads\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -119,11 +123,22 @@ if( $update_genomes ) {
 			&system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
 
 			unless (-e "$out.sam") {
-				&system_call("bwa", "aln", "-t", $update_nthreads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
-				&system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                if ($bwa_alg eq 'aln') {
+    				&system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
+    				&system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                }
+                elsif ($bwa_alg eq 'bwasw') {
+    				&system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    #Put back in MD tags, bwasw omits them:
+                    #E.g., samtools calmd -uS *_bwasw.sam parent1_ref.fa | samtools view -h -o out.sam -
+    				&system_call("samtools", "calmd", "-uS", "$out.sam", "$genomes_fa{$sp}.msg", "|", "samtools", "view", "-h", "-o", "$out.calmd.sam", "-") ;
+                    #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
+                    &system_call("mv","$out.calmd.sam","$out.sam")
+                }
+                else {die "Invalid bwa_alg parameter: $bwa_alg. Must be aln or bwasw";}
 			}
 
-			&system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam") ;
+			&system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg) ;
 
 			&system_call("samtools", "view", "-bt", "$genomes{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
 			&system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
@@ -179,10 +194,12 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
 
 print "\n\nRUNNING ", join(' ',('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
-       '--re_cutter', $re_cutter, '--linker_system', $linker_system )) ;
+       '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
+        $bwa_alg, '--bwa_threads', $bwa_threads )) ;
 &system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
-       '--re_cutter', $re_cutter, '--linker_system', $linker_system ) ;
+       '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
+        $bwa_alg, '--bwa_threads', $bwa_threads) ;
 
 ## Strip species out of reference column
 
@@ -217,7 +234,8 @@ if ($parse_or_map eq '--map-only') {
    			 '-r', $rfac,
    			 '-x', $sexchroms,
    			 '-z', $priors,
-   			 '-t', $theta
+   			 '-t', $theta,
+             '-w', $bwa_alg
    		  ) ;
 
    } close BARCODE;

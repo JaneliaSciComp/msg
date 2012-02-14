@@ -46,7 +46,72 @@ class App(CommandLineApp):
 
         op.add_option('--verbosity', action="store_true", dest='verbosity', default=False,
                       help="make lots of noise")
-	  
+
+        op.add_option('--bwa_alg', dest='bwa_alg', type='string', default='', 
+                      help='BWA algorithm used to generate SAM files. It should be "aln" or "bwasw".')
+
+    def open_as_pysam(self, filepath):
+        try:
+            return pysam.Samfile(filepath, 'r')
+        except:
+            return pysam.Samfile(filepath + '.gz','r')
+
+    @trace
+    def remove_non_matching_reads(self, sim_samfilepath, sec_samfilepath, delete_original_files=False):
+        """Only keep reads that are in both files (by qname) and don't appear more than 
+        once in either file."""   
+        sim_removed_count, sec_removed_count = 0,0
+        sim_reads, sec_reads = dict(), dict()
+        sim_samfile_in = self.open_as_pysam(sim_samfilepath)
+        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
+        sim_orig_header = sim_samfile_in.header
+        sec_orig_header = sec_samfile_in.header
+        
+        for read in sim_samfile_in.fetch():
+            sim_reads[read.qname] = sim_reads.setdefault(read.qname,0) + 1
+        for read in sec_samfile_in.fetch():
+            sec_reads[read.qname] = sec_reads.setdefault(read.qname,0) + 1
+        both = set(sim_reads.keys()).intersection(set(sec_reads.keys()))
+        print "Found %s reads in sim file" % len(sim_reads)
+        print "Found %s reads in sec file" % len(sec_reads)
+        print "Found %s reads common to both files" % len(both)
+
+        #write out only those in both
+        out_sim_samfilepath = sim_samfilepath + '.noncommon.reads.removed.sam'
+        out_sec_samfilepath = sec_samfilepath + '.noncommon.reads.removed.sam'
+        sim_outfile = pysam.Samfile(out_sim_samfilepath, 'wh', template=sim_samfile_in,
+            header=sim_orig_header)
+        sec_outfile = pysam.Samfile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
+            header=sec_orig_header)
+
+        #Close and re-open input files because I don't seem to have access to the seek 
+        #method in the pysam files to reset the fetch.
+        sim_samfile_in.close()
+        sec_samfile_in.close()
+        sim_samfile_in = self.open_as_pysam(sim_samfilepath)
+        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
+
+        for read in sim_samfile_in.fetch():
+            if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
+                sim_outfile.write(read)
+            else:
+                sim_removed_count +=1
+        for read in sec_samfile_in.fetch():
+            if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
+                sec_outfile.write(read)
+            else:
+                sec_removed_count +=1
+        
+        print "Removed %s simulans reads and %s seculans reads" % (sim_removed_count, sec_removed_count)
+        sim_outfile.close()
+        sec_outfile.close()
+        
+        if delete_original_files:
+            os.remove(sim_samfilepath)
+            os.remove(sec_samfilepath)
+        
+        return out_sim_samfilepath, out_sec_samfilepath
+    
     @trace
     def main(self):
 
@@ -73,19 +138,23 @@ class App(CommandLineApp):
         #e.g., /home/pinerog/msg_work/MSG_big/SRR071201.fastq_sam_files/aln_indivA1_AAATAG_par1.sam
         sim_samfilename = 'aln_' + self.options.indiv + '_par1.sam'
         sec_samfilename = 'aln_' + self.options.indiv + '_par2.sam'
+        sim_samfilepath = os.path.join(self.options.samdir, sim_samfilename)
+        sec_samfilepath = os.path.join(self.options.samdir, sec_samfilename)
+        
         #sim_samfilename = 'aln_' + self.options.indiv + '_par1.sam.gz'
         #sec_samfilename = 'aln_' + self.options.indiv + '_par2.sam.gz'
         print(sim_samfilename)
-        print(sim_samfilename)
+        print(sec_samfilename)
 
-        try:
-            sim_samfile = pysam.Samfile(os.path.join(self.options.samdir, sim_samfilename), 'r')
-            sec_samfile = pysam.Samfile(os.path.join(self.options.samdir, sec_samfilename), 'r')
-        except:
-            sim_samfilename += '.gz'
-            sec_samfilename += '.gz'
-            sim_samfile = pysam.Samfile(os.path.join(self.options.samdir, sim_samfilename), 'r')
-            sec_samfile = pysam.Samfile(os.path.join(self.options.samdir, sec_samfilename), 'r')
+        if self.options.bwa_alg.lower() == 'bwasw':
+            #bwasw throws away bad reads so we can end up with different numbers in each read.
+            #we run this to remove any reads that are not in both.                  
+            sim_samfilepath, sec_samfilepath = self.remove_non_matching_reads(sim_samfilepath, sec_samfilepath,
+                False)
+            gc.collect()
+        
+        sim_samfile = self.open_as_pysam(sim_samfilepath)
+        sec_samfile = self.open_as_pysam(sec_samfilepath)
 
         sim_outfilename = 'aln_' + self.options.indiv + '_par1-filtered.sam'
         sec_outfilename = 'aln_' + self.options.indiv + '_par2-filtered.sam'
@@ -118,9 +187,10 @@ class App(CommandLineApp):
         #Optimization: Store these values once instead of re-calc each use
         chroms = self.options.chroms
         verbosity = self.options.verbosity
-        omit_flags = set([0,16])
+        omit_flags = set([0,16]) #I believe these are actually "don't omit" flags
         memory_reserve = KEEP_MEM_FREE_AMT
         need_sort_and_dedupe = False
+        bwa_alg = self.options.bwa_alg.lower()
 
         print('Filtering reads and extracting %s reference allele information' % refsp)
         print(sim_samfilename)
@@ -160,22 +230,28 @@ class App(CommandLineApp):
                 print seq_forward['par2']
                 raise Exception('Reads on line %d differ' % i)
 
-            try:
-                one_best_match = read['par1'].opt('X0') == 1 and read['par2'].opt('X0') == 1
-                no_subpoptimal_matches = read['par1'].opt('X1') == 0 and read['par2'].opt('X1') == 0
-                mds_same          = read['par1'].opt('MD') == read['par2'].opt('MD')
-                cigars_same       = read['par1'].cigar == read['par2'].cigar
-                both_species_same = read['par1'].opt('NM') == 0 and read['par2'].opt('NM') == 0
-                if both_species_same: assert(mds_same and cigars_same)
-                indels            = any([read[sp].opt('XO') > 0 or read[sp].opt('XG') > 0 
-                                         for sp in species])
-        
-                ok = one_best_match and no_subpoptimal_matches
-                #ok = one_best_match and no_subpoptimal_matches and not indels
-                     ## and not both_species_same
+            #Check for valid reads.
+            if bwa_alg == 'bwasw':
+                #For SAM files generated from BWASW algorithm we don't get the same tags.  
+                #For now let reads through regardless of one best match or no suboptimal matches
+                ok = True
+            else:
+                try:
+                    one_best_match = read['par1'].opt('X0') == 1 and read['par2'].opt('X0') == 1
+                    no_subpoptimal_matches = read['par1'].opt('X1') == 0 and read['par2'].opt('X1') == 0
+                    mds_same          = read['par1'].opt('MD') == read['par2'].opt('MD')
+                    cigars_same       = read['par1'].cigar == read['par2'].cigar
+                    both_species_same = read['par1'].opt('NM') == 0 and read['par2'].opt('NM') == 0
+                    if both_species_same: assert(mds_same and cigars_same)
+                    indels            = any([read[sp].opt('XO') > 0 or read[sp].opt('XG') > 0 
+                                             for sp in species])
+            
+                    ok = one_best_match and no_subpoptimal_matches
+                    #ok = one_best_match and no_subpoptimal_matches and not indels
+                         ## and not both_species_same
 
-            except: ## KeyError
-                ok = False
+                except: ## KeyError or assert
+                    ok = False
 
             if ok:
                 sim_outfile.write(read['par1'])
@@ -385,7 +461,6 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
     str_sim_ref_seq = str(sim_ref_seq)
     str_ref_seq = str(ref_seq)
     len_str_sim_ref_seq = len(str_sim_ref_seq)
-
     while index_sim < len_str_sim_ref_seq:
 
         while str_sim_ref_seq[index_sim] == "_" and not str_ref_seq[index_ref] == "_":
@@ -402,7 +477,6 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
             #reconstruct_ref1 += "."
             #reconstruct_ref2 += "."
             #if verbosity: print "   \t----- (2 sim %s ref %s) updating index_sim %d and pos %d" % (str(sim_ref_seq[index_sim]),str(ref_seq[index_ref]),index_ref,ref_pos)
-
 
         if str_sim_ref_seq[index_sim] == "_" and str_ref_seq[index_ref] == "-":
             index_ref += 1

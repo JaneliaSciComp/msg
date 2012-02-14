@@ -38,7 +38,9 @@ my %params = (
           min_coverage => '2',
           max_coverage_exceeded_state => 'N',
           addl_qsub_option_for_exclusive_node => '',
-          addl_qsub_option_for_pe => ''
+          addl_qsub_option_for_pe => '',
+          bwa_alg => 'aln',
+          bwa_threads => '1',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -51,7 +53,7 @@ while (<IN>) { chomp $_;
 
 ### Configure some parameters ###
 $params{'chroms2plot'} = $params{'chroms'} unless (defined $params{'chroms2plot'});
-my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of BWA threads when updating genomes (must match msg.pl)
+my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of qsub slots when running pe option
 #add space after qsub options so we can insert into commands, add thread/slot count to -pe option
 if (defined $params{'addl_qsub_option_for_exclusive_node'} && $params{'addl_qsub_option_for_exclusive_node'}) {
     #example: go from user msg.cfg entered "-l excl=true" to "-l excl=true "
@@ -112,9 +114,10 @@ if (exists $params{'parent1_reads'}) {
 	' --min_coverage ' . $params{'min_coverage'} .
 	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .    
 	' --parent1-reads ' . $params{'parent1_reads'} .
-	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'};
+	' --bwaindex2 ' . $params{'bwaindex2'} .
+	' --bwa_alg ' . $params{'bwa_alg'} .
+	' --bwa_threads ' . $params{'bwa_threads'};
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
         print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
@@ -139,9 +142,10 @@ if (exists $params{'parent2_reads'}) {
 	' --min_coverage ' . $params{'min_coverage'} .
 	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .  
 	' --parent2-reads ' . $params{'parent2_reads'} .
-	' --threads ' . $params{'threads'} .
 	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'};
+	' --bwaindex2 ' . $params{'bwaindex2'} .
+	' --bwa_alg ' . $params{'bwa_alg'} .
+	' --bwa_threads ' . $params{'bwa_threads'};
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
         print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
@@ -164,9 +168,11 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --reads ' . $params{'reads'} . 
     ' --bwaindex1 ' . $params{'bwaindex1'} .
     ' --bwaindex2 ' . $params{'bwaindex2'} .
-	 ' --parent1 ' . $params{'parent1'} .
-	 ' --parent2 ' . $params{'parent2'} .
-	 " --parse_or_map parse-only || exit 100\n";
+    ' --bwa_alg ' . $params{'bwa_alg'} .
+    ' --bwa_threads ' . $params{'bwa_threads'} .
+    ' --parent1 ' . $params{'parent1'} .
+    ' --parent2 ' . $params{'parent2'} .
+    " --parse_or_map parse-only || exit 100\n";
 close OUT;
 system("chmod 755 msgRun1.sh");
 
@@ -187,46 +193,50 @@ open (OUT,'>msgRun2.sh');
 
 if ($params{'cluster'} != 0) {
    print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
-       "start=\$SGE_TASK_ID\n\n" .
-       "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n" .
-       "for ((h=\$start; h<=\$end; h++)); do\n" .
-#       "   sed -n '1,2p' $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
-#       "   sed -n \"\${h}p\" $params{'barcodes'} >> $params{'barcodes'}.\$h\n" .
-       "   sed -n \"\${h}p\" $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
-       '   perl msg/msg.pl ' .
-       ' --barcodes ' . $params{'barcodes'} . '.$h' .
-       ' --reads ' . $params{'reads'} . 
-       ' --parent1 ' . $params{'parent1'} . 
-       ' --parent2 ' . $params{'parent2'} .
-       ' --chroms ' . $params{'chroms'} .
-       ' --sexchroms ' . $params{'sexchroms'} .
-       ' --chroms2plot ' . $params{'chroms2plot'} .
-       ' --parse_or_map map-only' .
-       ' --deltapar1 ' . $params{'deltapar1'} .
-       ' --deltapar2 ' . $params{'deltapar2'} .
-       ' --recRate ' . $params{'recRate'} .
-       ' --rfac ' . $params{'rfac'} .
-       ' --priors ' . $params{'priors'} .
-       ' --theta ' . $params{'theta'} .
-       " || exit 100\ndone\n" .
-       "/bin/date\n";
+        "start=\$SGE_TASK_ID\n\n" .
+        "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n" .
+        "for ((h=\$start; h<=\$end; h++)); do\n" .
+        #       "   sed -n '1,2p' $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
+        #       "   sed -n \"\${h}p\" $params{'barcodes'} >> $params{'barcodes'}.\$h\n" .
+        "   sed -n \"\${h}p\" $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
+        '   perl msg/msg.pl ' .
+        ' --barcodes ' . $params{'barcodes'} . '.$h' .
+        ' --reads ' . $params{'reads'} . 
+        ' --parent1 ' . $params{'parent1'} . 
+        ' --parent2 ' . $params{'parent2'} .
+        ' --chroms ' . $params{'chroms'} .
+        ' --sexchroms ' . $params{'sexchroms'} .
+        ' --chroms2plot ' . $params{'chroms2plot'} .
+        ' --parse_or_map map-only' .
+        ' --deltapar1 ' . $params{'deltapar1'} .
+        ' --deltapar2 ' . $params{'deltapar2'} .
+        ' --recRate ' . $params{'recRate'} .
+        ' --rfac ' . $params{'rfac'} .
+        ' --priors ' . $params{'priors'} .
+        ' --theta ' . $params{'theta'} .
+        ' --bwa_alg ' . $params{'bwa_alg'} .
+        ' --bwa_threads ' . $params{'bwa_threads'} .
+        " || exit 100\ndone\n" .
+        "/bin/date\n";
 } else {
    print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
-       '   perl msg/msg.pl ' .
-       ' --barcodes ' . $params{'barcodes'} .
-       ' --reads ' . $params{'reads'} . 
-       ' --parent1 ' . $params{'parent1'} . 
-       ' --parent2 ' . $params{'parent2'} .
-       ' --chroms ' . $params{'chroms'} .
-       ' --sexchroms ' . $params{'sexchroms'} .
-       ' --chroms2plot ' . $params{'chroms2plot'} .
-       ' --parse_or_map map-only' .
-       ' --deltapar1 ' . $params{'deltapar1'} .
-       ' --deltapar2 ' . $params{'deltapar2'} .
-       ' --recRate ' . $params{'recRate'} .
-       ' --rfac ' . $params{'rfac'} .
-       ' --priors ' . $params{'priors'} .
-       ' --theta ' . $params{'theta'} .
+        '   perl msg/msg.pl ' .
+        ' --barcodes ' . $params{'barcodes'} .
+        ' --reads ' . $params{'reads'} . 
+        ' --parent1 ' . $params{'parent1'} . 
+        ' --parent2 ' . $params{'parent2'} .
+        ' --chroms ' . $params{'chroms'} .
+        ' --sexchroms ' . $params{'sexchroms'} .
+        ' --chroms2plot ' . $params{'chroms2plot'} .
+        ' --parse_or_map map-only' .
+        ' --deltapar1 ' . $params{'deltapar1'} .
+        ' --deltapar2 ' . $params{'deltapar2'} .
+        ' --recRate ' . $params{'recRate'} .
+        ' --rfac ' . $params{'rfac'} .
+        ' --priors ' . $params{'priors'} .
+        ' --theta ' . $params{'theta'} .
+        ' --bwa_alg ' . $params{'bwa_alg'} .
+        ' --bwa_threads ' . $params{'bwa_threads'} .
        "\n";
     }
 close OUT;

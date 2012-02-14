@@ -56,6 +56,12 @@ class ParseAndMap(CommandLineApp):
         op.add_option('-p', '--parse-only', dest='parse_only', default=False, action='store_true',
                       help='Just parse data?')
 
+        op.add_option('--bwa_alg', dest='bwa_alg', type='string', default="aln", 
+                      help='Algorithm for BWA mapping. Use aln or bwasw')
+
+        op.add_option('--bwa_threads', dest='bwa_threads', type='int', default=1, 
+                      help='Number of threads in the BWA multi-threading mode')
+
     def main(self):
         print datetimenow()
         print bcolors.OKBLUE + 'parse_and_map version %s' % __version__ + bcolors.ENDC
@@ -96,7 +102,9 @@ class ParseAndMap(CommandLineApp):
 #            print bcolors.WARN + 'Refusing to map parsed reads: samfiles output directory %s exists' % self.samdir + bcolors.ENDC
         else:
             self.map()
-            self.delete_files()
+            if self.options.bwa_alg != 'bwasw':
+                #bwasw doesn't make sai files    
+                self.delete_files()
 
     def parse(self):
 
@@ -231,33 +239,73 @@ class ParseAndMap(CommandLineApp):
 						(os.path.exists(aln_par2_sam) or os.path.exists(aln_par2_sam+'.gz'))): 
                 print bcolors.WARN + 'Refusing to map reads for ' + fastq_file_name + bcolors.ENDC
                 continue
-    
-            #Align each to sim - output fastq file
-            aln_par1_sai =  './aln_' + fastq_file_name + "_" + par1 + ".sai"
-            file_par1_sai = open(aln_par1_sai,"w")
-            file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
-            file_par1_sai = subprocess.Popen(['bwa', 'aln', '-t 1', parent1, fastq_file],stdout=file_par1_sai, stderr=file_par1_log)##0.2.4
-            
-            #Align each to sec - output fastq file
-            aln_par2_sai =  './aln_' + fastq_file_name + "_" + par2 + ".sai"
-            file_par2_sai = open(aln_par2_sai,"w")
-            file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
-            file_par2_sai = subprocess.Popen(['bwa', 'aln', '-t 1', parent2, fastq_file], stdout=file_par2_sai, stderr=file_par2_log)##0.2.4
 
-            #pause until these two processes are finished. If don't, then samse starts on empty or incomplete file
-            file_par1_sai.wait()
-            file_par2_sai.wait()
+            if self.options.bwa_alg == 'aln':
+                #Align each to sim - output fastq file
+                aln_par1_sai =  './aln_' + fastq_file_name + "_" + par1 + ".sai"
+                file_par1_sai = open(aln_par1_sai,"w")
+                file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
+                file_par1_sai = subprocess.Popen(['bwa', 'aln', 
+                    '-t ' + str(self.options.bwa_threads), parent1, fastq_file],
+                    stdout=file_par1_sai, stderr=file_par1_log)
+                
+                #Align each to sec - output fastq file
+                aln_par2_sai =  './aln_' + fastq_file_name + "_" + par2 + ".sai"
+                file_par2_sai = open(aln_par2_sai,"w")
+                file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
+                file_par2_sai = subprocess.Popen(['bwa', 'aln', '-t ' + str(self.options.bwa_threads), 
+                    parent2, fastq_file], 
+                    stdout=file_par2_sai, stderr=file_par2_log)
 
-            file_par1_sam = open(aln_par1_sam,'w')
-            file_par1_sam = subprocess.Popen(['bwa', "samse", parent1, aln_par1_sai, fastq_file],stdout=file_par1_sam)
-            file_par2_sam = open(aln_par2_sam,'w')
-            file_par2_sam = subprocess.Popen(['bwa', "samse", parent2, aln_par2_sai, fastq_file],stdout=file_par2_sam)
-            print "done sample " + fastq_file
-    
-            #pause until these two processes are finished. This is a precaution. Don't want to continue until sure sam files are completely written 
-            file_par1_sam.wait()
-            file_par2_sam.wait()
-    
+                #pause until these two processes are finished. If don't, then samse starts on empty or incomplete file
+                file_par1_sai.wait()
+                file_par2_sai.wait()
+
+                file_par1_sam = open(aln_par1_sam,'w')
+                file_par1_sam = subprocess.Popen(['bwa', "samse", parent1, aln_par1_sai, fastq_file],stdout=file_par1_sam)
+                file_par2_sam = open(aln_par2_sam,'w')
+                file_par2_sam = subprocess.Popen(['bwa', "samse", parent2, aln_par2_sai, fastq_file],stdout=file_par2_sam)
+                print "done sample " + fastq_file
+
+                #pause until these two processes are finished. This is a precaution. Don't want to continue until sure sam files are completely written 
+                file_par1_sam.wait()
+                file_par2_sam.wait()
+
+            elif self.options.bwa_alg == 'bwasw':
+                #Align each to sim - output fastq file
+                file_par1_sam = open(aln_par1_sam,'w')
+                file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
+                file_par1_sam = subprocess.Popen(['bwa', 
+                    'bwasw', '-t ' + str(self.options.bwa_threads), parent1, fastq_file],
+                    stdout=file_par1_sam, stderr=file_par1_log)
+                
+                #Align each to sec - output fastq file
+                file_par2_sam = open(aln_par2_sam,'w')
+                file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
+                file_par2_sam = subprocess.Popen(['bwa', 'bwasw', 
+                    '-t ' + str(self.options.bwa_threads), parent2, fastq_file], 
+                    stdout=file_par2_sam, stderr=file_par2_log)
+
+                #pause until these two processes are finished. This is a precaution. Don't want to continue until sure sam files are completely written 
+                file_par1_sam.wait()
+                file_par2_sam.wait()
+
+                #Add in MD tags since bwasw omits these
+                #(Write out to <output>.tmp.sam and then move.  Don't overwite input file directly since piped commands outputs continually.
+                result = subprocess.check_call(
+                    "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par1_sam, parent1, aln_par1_sam + '.tmp.sam'), 
+                    shell=True, stderr=file_par1_log)
+                result = subprocess.check_call("mv %s %s" % (aln_par1_sam + '.tmp.sam',aln_par1_sam), shell=True)
+
+                result = subprocess.check_call(
+                    "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par2_sam, parent2, aln_par2_sam + '.tmp.sam'), 
+                    shell=True, stderr=file_par2_log)
+                result = subprocess.check_call("mv %s %s" % (aln_par2_sam + '.tmp.sam',aln_par2_sam), shell=True)
+
+                print "done sample " + fastq_file
+            else:
+                raise ValueError("Invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
+   
             if int(self.options.num_ind) == sample_num:##0.2.6
                 break
             
