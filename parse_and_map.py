@@ -22,6 +22,25 @@ from mapping_functions import *
 from msglib import *
 from cmdline.cmdline import CommandLineApp
 
+##### INTERNAL OPTIONS (for developers) ######
+
+# Should MD tags be added to mapped SAM files when they are not included by default.
+# It seems to be very slow to add these in, but it does affect the end result.  I'm not sure 
+# where though.
+GEN_MD = True
+
+#Set divergence for mapping to a foreign reference (note: this is
+#strongly recommended for divergences >3%, as it will automatically
+#shut down BWA pre-mapping which otherwise cause occasional segfaults)
+#TODO: if this is useful to change, move it to msg.cfg
+#(stampy default if .001)
+STAMPY_SUBSTITUTION_RATE = 0.05 #5%
+
+# Filter out poor alignments, set this to 0 to skip
+MAPQ_FILTER = 20
+
+#############################
+
 class ParseAndMap(CommandLineApp):
     def __init__(self):
         CommandLineApp.__init__(self)
@@ -57,10 +76,22 @@ class ParseAndMap(CommandLineApp):
                       help='Just parse data?')
 
         op.add_option('--bwa_alg', dest='bwa_alg', type='string', default="aln", 
-                      help='Algorithm for BWA mapping. Use aln or bwasw')
+                      help='Algorithm for BWA mapping. Use aln or bwasw. This is ignored is use_stampy is 1.')
 
         op.add_option('--bwa_threads', dest='bwa_threads', type='int', default=1, 
                       help='Number of threads in the BWA multi-threading mode')
+
+        op.add_option('--use_stampy', dest='use_stampy', type='int', default=0, 
+                      help='Use stampy for mapping')
+
+        op.add_option('--stampy_premap_w_bwa', dest='stampy_premap_w_bwa', type='int', default=1, 
+                      help='Use BWA before running stampy for a speed boost.')
+
+        op.add_option('--stampy_pseudo_threads', dest='stampy_pseudo_threads', type='int', default=0, 
+                      help='Use qsub commands to split up stampy processes during mapping. NOT currently used.')
+
+        op.add_option('--stampy_substitution_rate', dest='stampy_substitution_rate', type='float', default=STAMPY_SUBSTITUTION_RATE, 
+                      help='Set divergence for mapping to a foreign reference')
 
     def main(self):
         print datetimenow()
@@ -102,8 +133,8 @@ class ParseAndMap(CommandLineApp):
 #            print bcolors.WARN + 'Refusing to map parsed reads: samfiles output directory %s exists' % self.samdir + bcolors.ENDC
         else:
             self.map()
-            if self.options.bwa_alg != 'bwasw':
-                #bwasw doesn't make sai files    
+            if self.options.bwa_alg == 'aln':
+                #bwasw and stampy don't make sai files    
                 self.delete_files()
 
     def parse(self):
@@ -190,12 +221,20 @@ class ParseAndMap(CommandLineApp):
         number_reads = count_lines(read_file)/4
         stats_file.write('junk\t%s\n' %(number_reads))   
         total_reads += number_reads
-    
+
         for ind in self.bc:
-            fastq_file = raw_data + '_parsed/' + 'indiv' + ind[1] + '_' + ind[0]
+            file_name = 'indiv' + ind[1] + '_' + ind[0]
+            fastq_file = raw_data + '_parsed/' + file_name
             number_reads = count_lines(fastq_file)/4
             total_reads += number_reads
             stats_file.write('indiv%s_%s\t%s\n' %(ind[1],ind[0],number_reads))
+            #TEMP - make sym links to parsed fq files with .fq extensions to they can run in stampy
+            #Later versions of stampy will hopefully fix this so we can remove it.
+            #ln trivia: symlink target should be relative to sym link, not where you are.
+            sym_link_args = 'ln -s %s %s.fq' % (file_name, fastq_file)
+            print "create ln with .fq extension:", sym_link_args
+            subprocess.check_call([sym_link_args], shell=True)
+                
         stats_file.write('total_reads\t%s' %(total_reads))
         stats_file.close()
     
@@ -203,6 +242,68 @@ class ParseAndMap(CommandLineApp):
         parsing_time = (self.parsed_time - self.start_time)
         print "Parsing took about %s minutes" %(parsing_time/60)
     
+    def _map_w_stampy(self, fastq_file, parent1, parent2, aln_par1_sam, aln_par2_sam, file_par1_log,
+        file_par2_log, misc_indiv_log):
+        #Align each to sim - output fastq file
+        #TEMP: stampy requires .fq extension on our files.  Remove this if stampy fixes it.
+        # I'm temporarily creating symlinks in the parse step.
+        fastq_file += '.fq'
+        if self.options.stampy_premap_w_bwa == 1:
+            args = ['stampy.py', '-v3', '--inputformat=fastq', '--substitutionrate=%s' % self.options.stampy_substitution_rate,
+                '--bwaoptions="-q10 %s"' % parent1, '-g',  
+                "%s.stampy.msg" % parent1, '-h', "%s.stampy.msg" % parent1, "-M",
+                fastq_file, "-o", aln_par1_sam]
+        else:
+            args = ['stampy.py', '--inputformat=fastq', '-g', "%s.stampy.msg" % parent1, 
+                '--substitutionrate=%s' % self.options.stampy_substitution_rate,
+                '-h', "%s.stampy.msg" % parent1, "-M",
+                fastq_file, "-o", aln_par1_sam]
+        print "stampy call parent 1:"
+        print ' '.join(args)
+        #popen notes: When shell==True, send in only one argument in list
+        file_par1_sam = subprocess.Popen([' '.join(args)],
+            stderr=file_par1_log, shell=True)
+        
+        #Align each to sec - output fastq file
+        if self.options.stampy_premap_w_bwa == 1:
+            args = ['stampy.py', '-v3', '--inputformat=fastq', '--substitutionrate=%s' % self.options.stampy_substitution_rate,
+                '--bwaoptions="-q10 %s"' % parent2, '-g',  
+                "%s.stampy.msg" % parent2, '-h', "%s.stampy.msg" % parent2, "-M",
+                fastq_file, "-o", aln_par2_sam]
+        else:
+            args = ['stampy.py', '--inputformat=fastq', '-g', "%s.stampy.msg" % parent2, 
+                '--substitutionrate=%s' % self.options.stampy_substitution_rate,
+                '-h', "%s.stampy.msg" % parent2, "-M",
+                fastq_file, "-o", aln_par2_sam]
+        print "stampy call parent 2:"
+        print ' '.join(args)
+        file_par2_sam = subprocess.Popen([' '.join(args)],
+            stderr=file_par2_log, shell=True)
+
+        #pause until these two processes are finished. This is a precaution. Don't want to continue until sure sam files are completely written 
+        file_par1_sam.wait()
+        file_par2_sam.wait()
+        
+        #Fix stampy generated sam files.  Fix headers, and sort
+        for file_to_fix in (aln_par1_sam, aln_par2_sam):
+            #Remove @PG header line from STAMPY generated SAM files since PYSAM dies on the PN: field.
+            subprocess.check_call(['grep -v "@PG" %s > %s.fixed' % (file_to_fix, file_to_fix)], 
+                shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
+            subprocess.check_call(['mv %s.fixed %s' % (file_to_fix, file_to_fix)], shell=True,
+                stdout=misc_indiv_log, stderr=misc_indiv_log)    
+            #convert to bam to prepare for sorting  
+            subprocess.check_call(['samtools view -btSh -o %s.bam %s' % (file_to_fix, file_to_fix)],
+                shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
+            #samtools adds .bam suffix to output FYI
+            subprocess.check_call(['samtools sort -n %s.bam %s.sorted' % (file_to_fix, file_to_fix)],
+                shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
+            #convert back to SAM and filter out poor alignments
+            subprocess.check_call(['samtools view -h -q %s -o %s %s.sorted.bam' % (MAPQ_FILTER ,file_to_fix, file_to_fix)],
+                shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
+            #remove temporary sorting files
+            os.remove('%s.bam' % file_to_fix)
+            os.remove('%s.sorted.bam' % file_to_fix)
+            
     def map(self):
 
         #Run bwa programs on each indiv file
@@ -235,16 +336,23 @@ class ParseAndMap(CommandLineApp):
             #Change format for sec - output sam file
             aln_par2_sam = './' + raw_data + '_sam_files/aln_' + fastq_file_name + "_" + par2 + ".sam"
 
-            if (	(os.path.exists(aln_par1_sam) or os.path.exists(aln_par1_sam+'.gz')) and
-						(os.path.exists(aln_par2_sam) or os.path.exists(aln_par2_sam+'.gz'))): 
+            if ((os.path.exists(aln_par1_sam) or os.path.exists(aln_par1_sam+'.gz')) and
+                (os.path.exists(aln_par2_sam) or os.path.exists(aln_par2_sam+'.gz'))): 
                 print bcolors.WARN + 'Refusing to map reads for ' + fastq_file_name + bcolors.ENDC
                 continue
 
-            if self.options.bwa_alg == 'aln':
+            file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
+            file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
+            misc_indiv_log = open(os.path.join(self.logdir, fastq_file_name + '.misc.log'), "w")
+
+            if self.options.use_stampy == 1:
+                self._map_w_stampy(fastq_file, parent1, parent2, aln_par1_sam, aln_par2_sam, file_par1_log,
+                    file_par2_log, misc_indiv_log)
+
+            elif self.options.bwa_alg == 'aln':
                 #Align each to sim - output fastq file
                 aln_par1_sai =  './aln_' + fastq_file_name + "_" + par1 + ".sai"
                 file_par1_sai = open(aln_par1_sai,"w")
-                file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
                 file_par1_sai = subprocess.Popen(['bwa', 'aln', 
                     '-t ' + str(self.options.bwa_threads), parent1, fastq_file],
                     stdout=file_par1_sai, stderr=file_par1_log)
@@ -252,7 +360,6 @@ class ParseAndMap(CommandLineApp):
                 #Align each to sec - output fastq file
                 aln_par2_sai =  './aln_' + fastq_file_name + "_" + par2 + ".sai"
                 file_par2_sai = open(aln_par2_sai,"w")
-                file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
                 file_par2_sai = subprocess.Popen(['bwa', 'aln', '-t ' + str(self.options.bwa_threads), 
                     parent2, fastq_file], 
                     stdout=file_par2_sai, stderr=file_par2_log)
@@ -265,7 +372,6 @@ class ParseAndMap(CommandLineApp):
                 file_par1_sam = subprocess.Popen(['bwa', "samse", parent1, aln_par1_sai, fastq_file],stdout=file_par1_sam)
                 file_par2_sam = open(aln_par2_sam,'w')
                 file_par2_sam = subprocess.Popen(['bwa', "samse", parent2, aln_par2_sai, fastq_file],stdout=file_par2_sam)
-                print "done sample " + fastq_file
 
                 #pause until these two processes are finished. This is a precaution. Don't want to continue until sure sam files are completely written 
                 file_par1_sam.wait()
@@ -274,14 +380,12 @@ class ParseAndMap(CommandLineApp):
             elif self.options.bwa_alg == 'bwasw':
                 #Align each to sim - output fastq file
                 file_par1_sam = open(aln_par1_sam,'w')
-                file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
                 file_par1_sam = subprocess.Popen(['bwa', 
                     'bwasw', '-t ' + str(self.options.bwa_threads), parent1, fastq_file],
                     stdout=file_par1_sam, stderr=file_par1_log)
                 
                 #Align each to sec - output fastq file
                 file_par2_sam = open(aln_par2_sam,'w')
-                file_par2_log = open(os.path.join(self.logdir, fastq_file_name + par2 + '.log'), "w")
                 file_par2_sam = subprocess.Popen(['bwa', 'bwasw', 
                     '-t ' + str(self.options.bwa_threads), parent2, fastq_file], 
                     stdout=file_par2_sam, stderr=file_par2_log)
@@ -290,22 +394,25 @@ class ParseAndMap(CommandLineApp):
                 file_par1_sam.wait()
                 file_par2_sam.wait()
 
+            else:
+                raise ValueError("Not using stampy and invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
+   
+            if GEN_MD and (self.options.bwa_alg == "bwasw" or self.options.use_stampy == 1):
                 #Add in MD tags since bwasw omits these
                 #(Write out to <output>.tmp.sam and then move.  Don't overwite input file directly since piped commands outputs continually.
+                #TODO: It might be worth sorting the input files first to speed this up. Measure and test.
                 result = subprocess.check_call(
                     "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par1_sam, parent1, aln_par1_sam + '.tmp.sam'), 
                     shell=True, stderr=file_par1_log)
                 result = subprocess.check_call("mv %s %s" % (aln_par1_sam + '.tmp.sam',aln_par1_sam), shell=True)
-
+                
                 result = subprocess.check_call(
                     "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par2_sam, parent2, aln_par2_sam + '.tmp.sam'), 
                     shell=True, stderr=file_par2_log)
                 result = subprocess.check_call("mv %s %s" % (aln_par2_sam + '.tmp.sam',aln_par2_sam), shell=True)
 
-                print "done sample " + fastq_file
-            else:
-                raise ValueError("Invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
-   
+            print "done sample " + fastq_file   
+
             if int(self.options.num_ind) == sample_num:##0.2.6
                 break
             

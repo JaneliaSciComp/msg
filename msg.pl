@@ -2,12 +2,16 @@
 use File::Basename;
 use File::Copy;
 use Getopt::Long ;
+use POSIX;
+
 $true = 1 ;
 $false = 0 ;
 $version = '0.0.1' ;
 sub system_call {
-	print "@_\n" ;
-	system("@_") == 0 or die "Error in @_: $?" ;
+    print 'started '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
+    print "  @_\n" ;
+    system("@_") == 0 or die "Error in @_: $?" ;
+    print 'ended '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
 }
 
 $src = dirname $0 ;
@@ -39,8 +43,24 @@ GetOptions(
 	'bwaindex2=s' => \$bwaindex2,
 	'theta=s' => \$theta,
     'bwa_alg=s' => \$bwa_alg,
-    'bwa_threads=i' => \$bwa_threads
+    'bwa_threads=i' => \$bwa_threads,
+    'use_stampy=i' => \$use_stampy,
+    'stampy_premap_w_bwa=i' => \$stampy_premap_w_bwa,
+    'stampy_pseudo_threads=i' => \$stampy_pseudo_threads,
+    'cluster=i' => \$cluster,
+    'addl_qsub_option_for_pe=s' => \$addl_qsub_option_for_pe,
+    'quality_trim_reads_thresh=i' => \$quality_trim_reads_thresh,
+    'quality_trim_reads_consec=i' => \$quality_trim_reads_consec
 	) ;
+
+#### INTERNAL OPTIONS (for developers) #####
+
+# Should MD tags be added to mapped SAM files when they are not included by default.
+# It's slower to add them but they seem to affect the output.
+$GEN_MD_TAGS = $true;
+$DEBUG_MODE = $true;
+
+############################################
 
 print "msg version:  $version\n" ;
 print `date` ;
@@ -57,6 +77,14 @@ print "bwaindex1 $bwaindex1\n\n";
 print "bwaindex2 $bwaindex2\n\n";
 print "bwa_alg $bwa_alg\n\n";
 print "bwa_threads $bwa_threads\n\n";
+print "use_stampy $use_stampy\n\n";
+print "stampy_premap_w_bwa $stampy_premap_w_bwa\n\n";
+print "stampy_pseudo_threads $stampy_pseudo_threads\n\n";
+print "cluster $cluster\n\n";
+print "addl_qsub_option_for_pe $addl_qsub_option_for_pe\n\n";
+print "quality_trim_reads_thresh $quality_trim_reads_thresh\n\n";
+print "quality_trim_reads_consec $quality_trim_reads_consec\n\n";
+
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -74,6 +102,60 @@ $genomes_fa{'parent1'} = $parent1_genome if $parent1_genome;
 $genomes_fa{'parent2'} = $parent2_genome if $parent2_genome;
 $genome_index{'parent1'} = $bwaindex1;
 $genome_index{'parent2'} = $bwaindex2;
+
+
+sub run_stampy_on_cluster {
+    # Run stampy on SGE cluster.  Normally all cluster calls should be in msgCluster.pl but it wasn't
+    # practical in this case.
+    
+    my ($sp, $bwa_options, $out) = @_;
+    
+    #Use 4 slots of the PE options is available since we need ~7GB of memory for each job.
+    #We assume PE option is available if the user has specified the option in config file.
+    if ($addl_qsub_option_for_pe) {$addl_qsub_option_for_pe = "-pe batch 4";} else {$addl_qsub_option_for_pe = "";}
+    
+    #write out a shell script since there are too many parameters to call qsub directly.
+    open (OUT,">msgRun0-$sp-stampy.sh");
+    print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
+        "start=\$SGE_TASK_ID\n\n" .
+        "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n" .
+        "for ((h=\$start; h<=\$end; h++)); do\n" .
+        "   stampy.py " . $bwa_options . 
+        " --processpart=\${h}/$stampy_pseudo_threads" .
+        " -g $sp.stampy.msg -h $sp.stampy.msg -M $reads_for_updating_fq{$sp}" .
+        " -o $out.tmp.\${h}.sam" .
+        "   || exit 100\n" .
+        "   samtools view -bhS -o $out.tmp.\${h}.bam $out.tmp.\${h}.sam\n" .
+        "done\n" .
+        "/bin/date\n";
+    close OUT;
+    system("chmod 755 msgRun0-$sp-stampy.sh");
+    #Note: using the uncompressed BAM option -u in the samtools view command above may give a speed
+    #boost however it causes an "[bam_header_read] EOF marker is absent." error when merging.
+    #I think this was fixed in later versions of samtools and this may be harmless here, but it's better
+    #to be safe so I took it out.  (reference: http://seqanswers.com/forums/showthread.php?t=15363)
+    
+    #run it
+    &system_call("qsub", "-t 1-${stampy_pseudo_threads}:1", $addl_qsub_option_for_pe, 
+        "-N msgRun0-$sp-stampy.$$", "-V", "-sync y", "-cwd", "-b y",
+        "./msgRun0-$sp-stampy.sh");
+    
+    #wait here until qsub is done
+    #merge all of the temp files back together
+    my @tmp_bam_file_names;
+    for (1..$stampy_pseudo_threads) {push(@tmp_bam_file_names, "$out.tmp.$_.bam");}
+    &system_call("samtools merge $out.stampy.tmp.bam " . join(" ", @tmp_bam_file_names));
+    #convert back to SAM format
+    &system_call("samtools view -h -o $out.sam $out.stampy.tmp.bam");
+    
+    #delete temp files and qsub rubbish
+    if (!$DEBUG_MODE) {
+        unlink("$out.stampy.tmp.bam");
+        &system_call("rm -f $out.tmp.*");
+        #!! remove qsub .pe and .po files here or does normal cleanup catch those?
+        #!! make sure normal output is caught by cleanup
+    }
+}
 
 ## -------------------------------------------------------------------------------
 ##
@@ -104,49 +186,87 @@ else {
 	$parent2_reads and die "Must use --update option with --parent2-reads" ;
 }
 
-
 if( $update_genomes ) {
-	print "Updating genomes\n";
-	foreach $sp ( keys %reads_for_updating ) {
-		if( -e $genomes_fa{$sp}.".msg.updated.fasta" ) {
-			print "$sp: updated genome files already present\n" ;
-			next ;
-		}
-	
-		&system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
-
-		$out = "update_reads-aligned-$sp" ;
-		unless( -e "$out.pileup" ) {
-
-			&system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
-				unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-			&system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
-
-			unless (-e "$out.sam") {
-                if ($bwa_alg eq 'aln') {
-    				&system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
-    				&system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+    print "Updating genomes\n";
+    foreach $sp ( keys %reads_for_updating ) {
+        if( -e $genomes_fa{$sp}.".msg.updated.fasta" ) {
+            print "$sp: updated genome files already present\n" ;
+            next ;
+        }
+        
+        #Trim reads if required
+        if ($quality_trim_reads_thresh > 0) {            
+            &system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
+                "-c",$quality_trim_reads_consec,"-q","-o",$reads_for_updating_fq{$sp});
+            $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq';
+        }
+    
+        &system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
+    
+        $out = "update_reads-aligned-$sp" ;
+        unless( -e "$out.pileup" ) {
+            #Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
+            &system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
+                unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
+            &system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
+    
+            unless (-e "$out.sam") {
+                if ($use_stampy == 1) {
+                    #Build stampy genome file
+                    &system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg") ;
+                    #Build stampy hash file
+                    &system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg") ;
+                    #Call stampy mapping with or without bwa
+                    my $bwa_options = "";
+                    if ($stampy_premap_w_bwa == 1) {
+                        $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg\"";
+                    }
+                    if (($stampy_pseudo_threads > 0) && ($cluster == 1)) {
+                        run_stampy_on_cluster($sp, $bwa_options, $out);
+                    }
+                    else {
+                        #Standard Stampy run w/o qsub
+                        &system_call("stampy.py", $bwa_options, 
+                            "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", "-M", 
+                            $reads_for_updating_fq{$sp}, "-o", "$out.sam") ;
+                    }                    
+                }
+                elsif ($bwa_alg eq 'aln') {
+                    &system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
+                    &system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
                 elsif ($bwa_alg eq 'bwasw') {
-    				&system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
-                    #Put back in MD tags, bwasw omits them:
-                    #E.g., samtools calmd -uS *_bwasw.sam parent1_ref.fa | samtools view -h -o out.sam -
-    				&system_call("samtools", "calmd", "-uS", "$out.sam", "$genomes_fa{$sp}.msg", "|", "samtools", "view", "-h", "-o", "$out.calmd.sam", "-") ;
-                    #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
-                    &system_call("mv","$out.calmd.sam","$out.sam")
+                    &system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
-                else {die "Invalid bwa_alg parameter: $bwa_alg. Must be aln or bwasw";}
-			}
+                else {die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln or bwasw (or set use_stampy=1)";}
 
-			&system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg) ;
+            }
+            # Filter out unmapped reads, etc
+            &system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
+            &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
+            &system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
+            
+            if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
+                if ($DEBUG_MODE == $true) {
+                    &system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
+                }
+                #Put back in MD tags, bwasw and stampy omit them:
+                &system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
+                if ($DEBUG_MODE == $true) {
+                    #copy instead of move for debug mode so we can view each step
+                    &system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
+                }
+                else {
+                    #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
+                    &system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam")
+                }
+            }
+            &system_call("samtools", "index", "$out.bam.sorted.bam") ;
+            &system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
 
-			&system_call("samtools", "view", "-bt", "$genomes{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
-			&system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
-			&system_call("samtools", "index", "$out.bam.sorted.bam") ;
-			&system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
+        }
 
-		}
-
+        #Update the parent genome with the newly mapped reads
 		&system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
             $max_coverage_exceeded_state, $max_coverage_stds);
 		unlink("$genomes_fa{$sp}.msg");
@@ -182,10 +302,20 @@ $parse_or_map = "--$parse_or_map" if ($parse_or_map);
 ### BWA INDEXING
 foreach $sp ( keys %genomes ) {
 	unless( -e "$genomes_fa{$sp}.bwt" and -e "$genomes_fa{$sp}.ann" ) {
-		## 1. Use BWA to align reads against existing genome -> sam file
+		## 1. Align reads against existing genome -> sam file
+		## Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
 		@args = ("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}) ;
+		print "Running index on reformatted fa:\n";
 		print "@args\n" ;
 		system("@args") == 0 or die "Error in @args: $?" ;
+		#When mapping with stampy, perform the genome and hash building steps here
+        if ($use_stampy == 1) {
+            #Build stampy genome file
+            &system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}) ;
+            #Build stampy hash file
+            &system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
+                "$genomes_fa{$sp}.stampy.msg") ;
+        }
 	}
 }
 
@@ -195,11 +325,13 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
 print "\n\nRUNNING ", join(' ',('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
        '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
-        $bwa_alg, '--bwa_threads', $bwa_threads )) ;
+        $bwa_alg, '--bwa_threads', $bwa_threads,
+        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa )) ;
 &system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
        '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
-        $bwa_alg, '--bwa_threads', $bwa_threads) ;
+        $bwa_alg, '--bwa_threads', $bwa_threads, 
+        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa) ;
 
 ## Strip species out of reference column
 
@@ -235,7 +367,8 @@ if ($parse_or_map eq '--map-only') {
    			 '-x', $sexchroms,
    			 '-z', $priors,
    			 '-t', $theta,
-             '-w', $bwa_alg
+             '-w', $bwa_alg,
+             '-e', $use_stampy
    		  ) ;
 
    } close BARCODE;

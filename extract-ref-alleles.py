@@ -14,9 +14,13 @@ from msglib import *
 import copy
 import shutil
 
+##### INTERNAL OPTIONS (for developers) ######
+
 #How much memory to keep free in mB.  This leaves some buffer in case other
 #jobs get allocated to the same node while this program is running.
 KEEP_MEM_FREE_AMT = 800
+
+##############################################
 
 class App(CommandLineApp):
     def __init__(self):
@@ -49,6 +53,9 @@ class App(CommandLineApp):
 
         op.add_option('--bwa_alg', dest='bwa_alg', type='string', default='', 
                       help='BWA algorithm used to generate SAM files. It should be "aln" or "bwasw".')
+
+        op.add_option('--use_stampy', dest='use_stampy', type='int', default=0, 
+            help='Was STAMPY used to generate SAM files? Set this to 1.')
 
     def open_as_pysam(self, filepath):
         try:
@@ -146,11 +153,12 @@ class App(CommandLineApp):
         print(sim_samfilename)
         print(sec_samfilename)
 
-        if self.options.bwa_alg.lower() == 'bwasw':
+        if self.options.bwa_alg.lower() == 'bwasw' or self.options.use_stampy:
             #bwasw throws away bad reads so we can end up with different numbers in each read.
-            #we run this to remove any reads that are not in both.                  
+            #we run this to remove any reads that are not in both.
+            # (Also use for STAMPY generated SAM files since the reads there also seem to differ.
             sim_samfilepath, sec_samfilepath = self.remove_non_matching_reads(sim_samfilepath, sec_samfilepath,
-                False)
+                True)
             gc.collect()
         
         sim_samfile = self.open_as_pysam(sim_samfilepath)
@@ -191,6 +199,7 @@ class App(CommandLineApp):
         memory_reserve = KEEP_MEM_FREE_AMT
         need_sort_and_dedupe = False
         bwa_alg = self.options.bwa_alg.lower()
+        use_stampy = self.options.use_stampy
 
         print('Filtering reads and extracting %s reference allele information' % refsp)
         print(sim_samfilename)
@@ -231,8 +240,8 @@ class App(CommandLineApp):
                 raise Exception('Reads on line %d differ' % i)
 
             #Check for valid reads.
-            if bwa_alg == 'bwasw':
-                #For SAM files generated from BWASW algorithm we don't get the same tags.  
+            if bwa_alg == 'bwasw' or use_stampy == 1:
+                #For SAM files generated from BWASW or STAMPY algorithms we don't get the same tags.  
                 #For now let reads through regardless of one best match or no suboptimal matches
                 ok = True
             else:
@@ -256,16 +265,16 @@ class App(CommandLineApp):
             if ok:
                 sim_outfile.write(read['par1'])
                 sec_outfile.write(read['par2'])
-
+                
                 #Fill in the refs and orths dicts
                 record_reference_alleles(
-							 refs['par1'][ref], refs['par2'][ref], 
-							 orths['par1'][ref], orths['par2'][ref], 
-							 read['par1'], read['par2'], 
-							 seq_forward['par1'], 
-							 ref_seqs['par1'][par2ref['par1']].seq, ref_seqs['par2'][par2ref['par2']].seq, 
-							 par2ref['par1'], par2ref['par2'], 
-							 verbosity)
+                    refs['par1'][ref], refs['par2'][ref], 
+                    orths['par1'][ref], orths['par2'][ref], 
+                    read['par1'], read['par2'], 
+                    seq_forward['par1'], 
+                    ref_seqs['par1'][par2ref['par1']].seq, ref_seqs['par2'][par2ref['par2']].seq, 
+                    par2ref['par1'], par2ref['par2'], 
+                    verbosity)
   
             if (not i % 1e4):
                 #print "At ref num %s. free memory is %s mB" % (i, get_free_memory())

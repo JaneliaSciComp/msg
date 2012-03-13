@@ -13,34 +13,39 @@ printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$s
 ### Default parameters
 die "ERROR: Can't locate msg.cfg.\n" unless (-e 'msg.cfg');
 my %params = (
-         barcodes       => 'NULL',
-         re_cutter      => 'MseI',
-         linker_system  => 'Dros_SR_vII',
-	      reads          => 'NULL',
-	      parent1        => 'NULL',
-	      parent2        => 'NULL',
-	      chroms         => 'all',
-	      sexchroms      => 'X',
-	      chroms2plot    => 'all',
-	      deltapar1      => '.01',
-	      deltapar2      => '.01',
-	      recRate        => '3',
-	      rfac		      => '0.00001',
-	      thinfac	      => '1',
-	      difffac	      => '.01',
-	      priors         => '0,.5,.5',
-	      bwaindex1      => 'bwtsw',
-	      bwaindex2      => 'bwtsw',
-	      pnathresh      => '0.03',
-	      cluster        => '1',
-	      threads        => '8',
-	      theta        => '1',
-          min_coverage => '2',
-          max_coverage_exceeded_state => 'N',
-          addl_qsub_option_for_exclusive_node => '',
-          addl_qsub_option_for_pe => '',
-          bwa_alg => 'aln',
-          bwa_threads => '1',
+        barcodes       => 'NULL',
+        re_cutter      => 'MseI',
+        linker_system  => 'Dros_SR_vII',
+        reads          => 'NULL',
+        parent1        => 'NULL',
+        parent2        => 'NULL',
+        chroms         => 'all',
+        sexchroms      => 'X',
+        chroms2plot    => 'all',
+        deltapar1      => '.01',
+        deltapar2      => '.01',
+        recRate        => '3',
+        rfac		      => '0.00001',
+        thinfac	      => '1',
+        difffac	      => '.01',
+        priors         => '0,.5,.5',
+        bwaindex1      => 'bwtsw',
+        bwaindex2      => 'bwtsw',
+        pnathresh      => '0.03',
+        cluster        => '1',
+        threads        => '8',
+        theta        => '1',
+        min_coverage => '2',
+        max_coverage_exceeded_state => 'N',
+        addl_qsub_option_for_exclusive_node => '',
+        addl_qsub_option_for_pe => '',
+        bwa_alg => 'aln',
+        bwa_threads => '1',
+        use_stampy => '0',
+        stampy_premap_w_bwa => '1',
+        stampy_pseudo_threads => '0',
+        quality_trim_reads_thresh => '0',
+        quality_trim_reads_consec => '30',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -84,7 +89,6 @@ foreach my $key (sort keys %params) {
 }
 print "\n" ;
 
-
 ### check if all the desired chroms are found in both parental files
 ### report their lengths also
 my %par1_reads = &readFasta($params{'parent1'});
@@ -101,6 +105,21 @@ print OUT "chr,length\n";
 foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; } 
 close OUT;
 
+#Trim reads if required
+open (OUT,'>msgRun0-0.sh');
+if ($params{'quality_trim_reads_thresh'} > 0) {
+    $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
+    print OUT "python msg/TQSfastq.py" . " -f " . $params{'reads'} . " -t " . $params{'quality_trim_reads_thresh'} .
+            " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'};
+}
+else {
+    #just leave msgRun0-0.sh blank for consistancy
+    #make new name same as old name
+    $params{'reads.filtered'} = $params{'reads'};
+}
+close OUT;
+system("chmod 755 msgRun0-0.sh");    
+
 if (exists $params{'parent1_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
     open (OUT,'>msgRun0-1.sh');
@@ -108,7 +127,7 @@ if (exists $params{'parent1_reads'}) {
 	'perl msg/msg.pl ' .
 	' --update ' .
 	' --barcodes ' . $params{'barcodes'} .
-	' --reads ' . $params{'reads'} . 
+	' --reads ' . $params{'reads.filtered'} . 
 	' --parent1 ' . $params{'parent1'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --min_coverage ' . $params{'min_coverage'} .
@@ -117,10 +136,20 @@ if (exists $params{'parent1_reads'}) {
 	' --bwaindex1 ' . $params{'bwaindex1'} .
 	' --bwaindex2 ' . $params{'bwaindex2'} .
 	' --bwa_alg ' . $params{'bwa_alg'} .
-	' --bwa_threads ' . $params{'bwa_threads'};
+	' --bwa_threads ' . $params{'bwa_threads'} .
+    ' --use_stampy ' . $params{'use_stampy'} .
+    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
+    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
+    ' --cluster ' . $params{'cluster'} .
+    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
+    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'}
+    ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
         print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
+    }
+    if ($params{'addl_qsub_option_for_pe'}) {
+        print OUT ' --addl_qsub_option_for_pe pe';
     }
 	print OUT " || exit 100\n";
     close OUT;
@@ -136,7 +165,7 @@ if (exists $params{'parent2_reads'}) {
 	'perl msg/msg.pl ' .
 	' --update ' .
 	' --barcodes ' . $params{'barcodes'} .
-	' --reads ' . $params{'reads'} . 
+	' --reads ' . $params{'reads.filtered'} . 
 	' --parent2 ' . $params{'parent2'} . 
 	' --update_minQV ' . $params{'update_minQV'} .
 	' --min_coverage ' . $params{'min_coverage'} .
@@ -145,11 +174,21 @@ if (exists $params{'parent2_reads'}) {
 	' --bwaindex1 ' . $params{'bwaindex1'} .
 	' --bwaindex2 ' . $params{'bwaindex2'} .
 	' --bwa_alg ' . $params{'bwa_alg'} .
-	' --bwa_threads ' . $params{'bwa_threads'};
+	' --bwa_threads ' . $params{'bwa_threads'} .
+    ' --use_stampy ' . $params{'use_stampy'} .
+    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
+    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
+    ' --cluster ' . $params{'cluster'} .
+    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
+    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'}
+    ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
         print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
     }
+    if ($params{'addl_qsub_option_for_pe'}) {
+        print OUT ' --addl_qsub_option_for_pe pe';
+    }    
 	print OUT " || exit 100\n";
     close OUT;
     system("chmod 755 msgRun0-2.sh");
@@ -165,11 +204,13 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --barcodes ' . $params{'barcodes'} .
     ' --re_cutter ' . $params{'re_cutter'} .
     ' --linker_system ' . $params{'linker_system'} .
-    ' --reads ' . $params{'reads'} . 
+    ' --reads ' . $params{'reads.filtered'} . 
     ' --bwaindex1 ' . $params{'bwaindex1'} .
     ' --bwaindex2 ' . $params{'bwaindex2'} .
     ' --bwa_alg ' . $params{'bwa_alg'} .
     ' --bwa_threads ' . $params{'bwa_threads'} .
+    ' --use_stampy ' . $params{'use_stampy'} .
+    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
     ' --parent1 ' . $params{'parent1'} .
     ' --parent2 ' . $params{'parent2'} .
     " --parse_or_map parse-only || exit 100\n";
@@ -201,7 +242,7 @@ if ($params{'cluster'} != 0) {
         "   sed -n \"\${h}p\" $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
         '   perl msg/msg.pl ' .
         ' --barcodes ' . $params{'barcodes'} . '.$h' .
-        ' --reads ' . $params{'reads'} . 
+        ' --reads ' . $params{'reads.filtered'} . 
         ' --parent1 ' . $params{'parent1'} . 
         ' --parent2 ' . $params{'parent2'} .
         ' --chroms ' . $params{'chroms'} .
@@ -216,13 +257,15 @@ if ($params{'cluster'} != 0) {
         ' --theta ' . $params{'theta'} .
         ' --bwa_alg ' . $params{'bwa_alg'} .
         ' --bwa_threads ' . $params{'bwa_threads'} .
+        ' --use_stampy ' . $params{'use_stampy'} .
+        ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
    print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
         '   perl msg/msg.pl ' .
         ' --barcodes ' . $params{'barcodes'} .
-        ' --reads ' . $params{'reads'} . 
+        ' --reads ' . $params{'reads.filtered'} . 
         ' --parent1 ' . $params{'parent1'} . 
         ' --parent2 ' . $params{'parent2'} .
         ' --chroms ' . $params{'chroms'} .
@@ -237,6 +280,8 @@ if ($params{'cluster'} != 0) {
         ' --theta ' . $params{'theta'} .
         ' --bwa_alg ' . $params{'bwa_alg'} .
         ' --bwa_threads ' . $params{'bwa_threads'} .
+        ' --use_stampy ' . $params{'use_stampy'} .
+        ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
        "\n";
     }
 close OUT;
@@ -248,6 +293,10 @@ mkdir "msgOut.$$" unless (-d "msgOut.$$");
 mkdir "msgError.$$" unless (-d "msgError.$$");
 
 ### Run jobs!
+
+#always run trim, sh file is empty if not requested
+system("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
       system("qsub -N msgRun0-1.$$  $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;

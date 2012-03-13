@@ -11,7 +11,6 @@ decode.pileup.bases <- function(x, ref) {
     ## c..c   .+2cc   ^fa^f,^f,
     ## ref is a vector containing the corresponding reference alleles
     ## http://samtools.sourceforge.net/pileup.shtml
-    
     x <- gsub("\\^.", "", x) ## begin contiguous something...
     x <- gsub("\\$", "", x)  ## end contiguous something...
 
@@ -26,10 +25,12 @@ decode.pileup.bases <- function(x, ref) {
         re <- paste("[\\+-]", len, paste(rep('[ACGTNXMRWSYKVHDBacgtnxmrwsykvhdb]', len), collapse=""), sep="")
         x <- gsub(re, "", x)
         len <- len + 1
-        if(len > 10) {
-            print(x)
-            stop()
-        }
+        
+        ## We used to die if there were any indels > length 10 but we decided there's no harm in allowing them through.
+        ##if(len > 10) {
+        ##    print(x)
+        ##    stop()
+        ##}
     }
     ## x <- gsub("N", "", x)
 

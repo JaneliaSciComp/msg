@@ -803,11 +803,12 @@ cleanupReadPileup <- function(x, ref) {
         re <- paste("[\\+-]", len, paste(rep('[ACGTNXMRWSYKVHDBacgtnxmrwsykvhdb]', len), collapse=""), sep="")
         x <- gsub(re, "", x)
         len <- len + 1
-        if(len > 10) {
-            print("hmmlib.R: replacing more than 10")
-            print(x)
-            stop()
-        }
+        ## We used to die if there were any indels > length 10 but we decided there's no harm in allowing them through.
+        #if(len > 10) {
+        #    print("hmmlib.R: replacing more than 10")
+        #    print(x)
+        #    stop()
+        #}
     }
 
     x <- mapply(gsub, pattern=list("[\\.,]"), replacement=ref, x=x)
