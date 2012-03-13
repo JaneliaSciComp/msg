@@ -105,7 +105,7 @@ print OUT "chr,length\n";
 foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; } 
 close OUT;
 
-#Trim reads if required
+#Trim barcoded reads for quality if required, set reads.filtered paramater which all downstream calculations will look at.
 open (OUT,'>msgRun0-0.sh');
 if ($params{'quality_trim_reads_thresh'} > 0) {
     $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
@@ -294,13 +294,18 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 
 ### Run jobs!
 
-#always run trim, sh file is empty if not requested
-system("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+#Trim barcoded reads for quality (If not requested the .sh file is simply blank)
+if ($params{'cluster'} != 0) {
+    system("qsub -N msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-0.sh") ;
+}
+else {
+    system("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+}
 
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$  $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      system("qsub -N msgRun0-2.$$  $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -310,7 +315,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent1_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      system("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -319,7 +324,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      system("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       system("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
@@ -327,7 +332,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    }
 }
 else { 
-   if ($params{'cluster'} != 0) { system("qsub -N msgRun1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
+   if ($params{'cluster'} != 0) { system("qsub -N msgRun1.$$ -hold_jid msgRun0-0.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
    else { system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
 }
 
@@ -339,7 +344,7 @@ if ($params{'cluster'} != 0) {
    #Run a simple validation
    system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
    #Cleanup - move output files to folders, remove barcode related files
-   system("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   system("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
    system("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    system("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
@@ -347,7 +352,7 @@ if ($params{'cluster'} != 0) {
    #Run a simple validation
    system("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
    #Cleanup - move output files to folders, remove barcode related files
-   system("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; rm -f $params{'barcodes'}.*");
+   system("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
 }
 
 print "\nNOTE: Output and error messages are located in: msgOut.$$ and msgError.$$ \n\n";

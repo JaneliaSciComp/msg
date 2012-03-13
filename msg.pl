@@ -58,7 +58,7 @@ GetOptions(
 # Should MD tags be added to mapped SAM files when they are not included by default.
 # It's slower to add them but they seem to affect the output.
 $GEN_MD_TAGS = $true;
-$DEBUG_MODE = $true;
+$DEBUG_MODE = $false;
 
 ############################################
 
@@ -152,9 +152,11 @@ sub run_stampy_on_cluster {
     if (!$DEBUG_MODE) {
         unlink("$out.stampy.tmp.bam");
         &system_call("rm -f $out.tmp.*");
-        #!! remove qsub .pe and .po files here or does normal cleanup catch those?
-        #!! make sure normal output is caught by cleanup
     }
+    unless(-e 'stampy_logs' or mkdir 'stampy_logs') {
+        die "Unable to create stampy_logs\n";
+    }
+    &system_call("mv -f msgRun0-$sp-stampy.* stampy_logs");
 }
 
 ## -------------------------------------------------------------------------------
@@ -194,7 +196,7 @@ if( $update_genomes ) {
             next ;
         }
         
-        #Trim reads if required
+        #Trim reads if required (you could run this conncurrently while trimming barcoded reads for a speed up in the future.)
         if ($quality_trim_reads_thresh > 0) {            
             &system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
                 "-c",$quality_trim_reads_consec,"-q","-o",$reads_for_updating_fq{$sp});
