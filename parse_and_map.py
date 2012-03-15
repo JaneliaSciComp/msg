@@ -29,15 +29,8 @@ from cmdline.cmdline import CommandLineApp
 # where though.
 GEN_MD = True
 
-#Set divergence for mapping to a foreign reference (note: this is
-#strongly recommended for divergences >3%, as it will automatically
-#shut down BWA pre-mapping which otherwise cause occasional segfaults)
-#TODO: if this is useful to change, move it to msg.cfg
-#(stampy default if .001)
-STAMPY_SUBSTITUTION_RATE = 0.05 #5%
-
-# Filter out poor alignments, set this to 0 to skip
-MAPQ_FILTER = 20
+# Be verbose
+DEBUG = True
 
 #############################
 
@@ -90,8 +83,16 @@ class ParseAndMap(CommandLineApp):
         op.add_option('--stampy_pseudo_threads', dest='stampy_pseudo_threads', type='int', default=0, 
                       help='Use qsub commands to split up stampy processes during mapping. NOT currently used.')
 
-        op.add_option('--stampy_substitution_rate', dest='stampy_substitution_rate', type='float', default=STAMPY_SUBSTITUTION_RATE, 
+        #Set divergence for mapping to a foreign reference (note: this is
+        #strongly recommended for divergences >3%, as it will automatically
+        #shut down BWA pre-mapping which otherwise cause occasional segfaults)
+        #(stampy default if .001)
+        op.add_option('--indiv_stampy_substitution_rate', dest='stampy_substitution_rate', type='float', default=0.001, 
                       help='Set divergence for mapping to a foreign reference')
+                      
+        op.add_option('--indiv_mapq_filter', dest='mapq_filter', type='int', default=0, 
+                      help='Filter out poor alignments.  Set this to 0 to skip.')
+                      
 
     def main(self):
         print datetimenow()
@@ -297,8 +298,8 @@ class ParseAndMap(CommandLineApp):
             #samtools adds .bam suffix to output FYI
             subprocess.check_call(['samtools sort -n %s.bam %s.sorted' % (file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
-            #convert back to SAM and filter out poor alignments
-            subprocess.check_call(['samtools view -h -q %s -o %s %s.sorted.bam' % (MAPQ_FILTER ,file_to_fix, file_to_fix)],
+            #convert back to SAM
+            subprocess.check_call(['samtools view -h -o %s %s.sorted.bam' % (file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
             #remove temporary sorting files
             os.remove('%s.bam' % file_to_fix)
@@ -397,19 +398,25 @@ class ParseAndMap(CommandLineApp):
             else:
                 raise ValueError("Not using stampy and invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
    
+            #After updating files with options below, should we keep the intermediate version around:
+            put_back_command = DEBUG and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
+            if self.options.mapq_filter:
+                # remove poor alignments if requested
+                for (sam_file, log_file) in ((aln_par1_sam,file_par1_log), (aln_par2_sam,file_par2_log)):
+                    subprocess.check_call('samtools view -Sh -q %s -o %s.mapq_filtered.sam %s' % (
+                        self.options.mapq_filter ,sam_file, sam_file),
+                        shell=True, stdout=log_file, stderr=log_file)
+                    result = subprocess.check_call("%s -f %s %s" % (put_back_command, sam_file + '.mapq_filtered.sam',sam_file), shell=True)
+   
             if GEN_MD and (self.options.bwa_alg == "bwasw" or self.options.use_stampy == 1):
                 #Add in MD tags since bwasw omits these
                 #(Write out to <output>.tmp.sam and then move.  Don't overwite input file directly since piped commands outputs continually.
                 #TODO: It might be worth sorting the input files first to speed this up. Measure and test.
-                result = subprocess.check_call(
-                    "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par1_sam, parent1, aln_par1_sam + '.tmp.sam'), 
-                    shell=True, stderr=file_par1_log)
-                result = subprocess.check_call("mv %s %s" % (aln_par1_sam + '.tmp.sam',aln_par1_sam), shell=True)
-                
-                result = subprocess.check_call(
-                    "samtools calmd -uS %s %s | samtools view -h -o %s -" % (aln_par2_sam, parent2, aln_par2_sam + '.tmp.sam'), 
-                    shell=True, stderr=file_par2_log)
-                result = subprocess.check_call("mv %s %s" % (aln_par2_sam + '.tmp.sam',aln_par2_sam), shell=True)
+                for (sam_file, parent_, log_file) in ((aln_par1_sam, parent1, file_par1_log),(aln_par2_sam, parent2, file_par2_log)):
+                    result = subprocess.check_call(
+                        "samtools calmd -uS %s %s | samtools view -h -o %s -" % (sam_file, parent_, sam_file + '.added_calmd.sam'), 
+                        shell=True, stderr=log_file)
+                    result = subprocess.check_call("%s -f %s %s" % (put_back_command, sam_file + '.added_calmd.sam',sam_file), shell=True)
 
             print "done sample " + fastq_file   
 

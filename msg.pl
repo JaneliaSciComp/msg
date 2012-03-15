@@ -8,7 +8,7 @@ $true = 1 ;
 $false = 0 ;
 $version = '0.0.1' ;
 sub system_call {
-    print 'started '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
+    print "\nstarted ".POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
     print "  @_\n" ;
     system("@_") == 0 or die "Error in @_: $?" ;
     print 'ended '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
@@ -18,30 +18,30 @@ $src = dirname $0 ;
 $update_genomes = $false ;
 
 GetOptions(
-	'barcodes|b=s' => \$barcodes,
-   're_cutter=s' => \$re_cutter,
-   'linker_system=s' => \$linker_system,
-	'reads|i=s' => \$raw_read_data,
-	'update|u' => \$update_genomes,
-	'parent1=s' => \$parent1_genome,
-	'parent2=s' => \$parent2_genome,
-	'parent1-reads=s' => \$parent1_reads,
-	'parent2-reads=s' => \$parent2_reads,
-	'update_minQV=i' => \$update_minQV,
-	'min_coverage=i' => \$min_coverage,
-	'max_coverage_stds=i' => \$max_coverage_stds,
+    'barcodes|b=s' => \$barcodes,
+    're_cutter=s' => \$re_cutter,
+    'linker_system=s' => \$linker_system,
+    'reads|i=s' => \$raw_read_data,
+    'update|u' => \$update_genomes,
+    'parent1=s' => \$parent1_genome,
+    'parent2=s' => \$parent2_genome,
+    'parent1-reads=s' => \$parent1_reads,
+    'parent2-reads=s' => \$parent2_reads,
+    'update_minQV=i' => \$update_minQV,
+    'min_coverage=i' => \$min_coverage,
+    'max_coverage_stds=i' => \$max_coverage_stds,
     'max_coverage_exceeded_state=s' => \$max_coverage_exceeded_state,
-	'parse_or_map=s' => \$parse_or_map,
-	'priors=s' => \$priors,
-	'chroms=s' => \$chroms,
-	'sexchroms=s' => \$sexchroms,
-	'chroms2plot=s' => \$chroms2plot,
-	'deltapar1=s' => \$deltapar1,
-	'deltapar2=s' => \$deltapar2,
-	'rfac=s' => \$rfac,
-	'bwaindex1=s' => \$bwaindex1,
-	'bwaindex2=s' => \$bwaindex2,
-	'theta=s' => \$theta,
+    'parse_or_map=s' => \$parse_or_map,
+    'priors=s' => \$priors,
+    'chroms=s' => \$chroms,
+    'sexchroms=s' => \$sexchroms,
+    'chroms2plot=s' => \$chroms2plot,
+    'deltapar1=s' => \$deltapar1,
+    'deltapar2=s' => \$deltapar2,
+    'rfac=s' => \$rfac,
+    'bwaindex1=s' => \$bwaindex1,
+    'bwaindex2=s' => \$bwaindex2,
+    'theta=s' => \$theta,
     'bwa_alg=s' => \$bwa_alg,
     'bwa_threads=i' => \$bwa_threads,
     'use_stampy=i' => \$use_stampy,
@@ -50,8 +50,12 @@ GetOptions(
     'cluster=i' => \$cluster,
     'addl_qsub_option_for_pe=s' => \$addl_qsub_option_for_pe,
     'quality_trim_reads_thresh=i' => \$quality_trim_reads_thresh,
-    'quality_trim_reads_consec=i' => \$quality_trim_reads_consec
-	) ;
+    'quality_trim_reads_consec=i' => \$quality_trim_reads_consec,
+    'indiv_stampy_substitution_rate=f' => \$indiv_stampy_substitution_rate,
+    'parent_stampy_substitution_rate=f' => \$parent_stampy_substitution_rate,
+    'indiv_mapq_filter=i' => \$indiv_mapq_filter,
+    'parent_mapq_filter=i' => \$parent_mapq_filter,
+    );
 
 #### INTERNAL OPTIONS (for developers) #####
 
@@ -84,7 +88,10 @@ print "cluster $cluster\n\n";
 print "addl_qsub_option_for_pe $addl_qsub_option_for_pe\n\n";
 print "quality_trim_reads_thresh $quality_trim_reads_thresh\n\n";
 print "quality_trim_reads_consec $quality_trim_reads_consec\n\n";
-
+print "indiv_stampy_substitution_rate $indiv_stampy_substitution_rate\n\n";
+print "parent_stampy_substitution_rate $parent_stampy_substitution_rate\n\n";
+print "indiv_mapq_filter $indiv_mapq_filter\n\n";
+print "parent_mapq_filter $parent_mapq_filter\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -123,6 +130,7 @@ sub run_stampy_on_cluster {
         "   stampy.py " . $bwa_options . 
         " --processpart=\${h}/$stampy_pseudo_threads" .
         " -g $sp.stampy.msg -h $sp.stampy.msg -M $reads_for_updating_fq{$sp}" .
+        " --substitutionrate $parent_stampy_substitution_rate" .
         " -o $out.tmp.\${h}.sam" .
         "   || exit 100\n" .
         "   samtools view -bhS -o $out.tmp.\${h}.bam $out.tmp.\${h}.sam\n" .
@@ -229,8 +237,9 @@ if( $update_genomes ) {
                     else {
                         #Standard Stampy run w/o qsub
                         &system_call("stampy.py", $bwa_options, 
-                            "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", "-M", 
-                            $reads_for_updating_fq{$sp}, "-o", "$out.sam") ;
+                            "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", 
+                            "--substitutionrate", $parent_stampy_substitution_rate,
+                            "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam") ;
                     }                    
                 }
                 elsif ($bwa_alg eq 'aln') {
@@ -245,7 +254,12 @@ if( $update_genomes ) {
             }
             # Filter out unmapped reads, etc
             &system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
-            &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam") ;
+            if ($parent_mapq_filter > 0) {
+                &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam");
+            }
+            else {
+                &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam");
+            }
             &system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
             
             if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
@@ -321,19 +335,19 @@ foreach $sp ( keys %genomes ) {
 	}
 }
 
+
+#Map each individual (when called by msgRun2 with map-only, or parse all individuals when
+# called by msgRun1 with parse only)
 $samfiles_dir = basename($raw_read_data) . "_sam_files" ;
 mkdir $samfiles_dir unless (-d $samfiles_dir);
-
-print "\n\nRUNNING ", join(' ',('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
-		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
-       '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
-        $bwa_alg, '--bwa_threads', $bwa_threads,
-        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa )) ;
 &system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
        '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
         $bwa_alg, '--bwa_threads', $bwa_threads, 
-        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa) ;
+        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa,
+        '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
+        '--indiv_mapq_filter', $indiv_mapq_filter
+        ) ;
 
 ## Strip species out of reference column
 

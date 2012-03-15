@@ -46,6 +46,12 @@ my %params = (
         stampy_pseudo_threads => '0',
         quality_trim_reads_thresh => '0',
         quality_trim_reads_consec => '30',
+        indiv_stampy_substitution_rate => '0.001',
+        parent1_stampy_substitution_rate => '0.001',
+        parent2_stampy_substitution_rate => '0.001',
+        indiv_mapq_filter => '0',
+        parent1_mapq_filter => '0',
+        parent2_mapq_filter => '0',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -142,7 +148,9 @@ if (exists $params{'parent1_reads'}) {
     ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
     ' --cluster ' . $params{'cluster'} .
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'}
+    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
+    ' --parent_stampy_substitution_rate ' . $params{'parent1_stampy_substitution_rate'} .
+    ' --parent_mapq_filter ' . $params{'parent1_mapq_filter'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -180,7 +188,9 @@ if (exists $params{'parent2_reads'}) {
     ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
     ' --cluster ' . $params{'cluster'} .
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'}
+    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
+    ' --parent_stampy_substitution_rate ' . $params{'parent2_stampy_substitution_rate'} .
+    ' --parent_mapq_filter ' . $params{'parent2_mapq_filter'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -213,6 +223,8 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
     ' --parent1 ' . $params{'parent1'} .
     ' --parent2 ' . $params{'parent2'} .
+    ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
+    ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
     " --parse_or_map parse-only || exit 100\n";
 close OUT;
 system("chmod 755 msgRun1.sh");
@@ -259,6 +271,8 @@ if ($params{'cluster'} != 0) {
         ' --bwa_threads ' . $params{'bwa_threads'} .
         ' --use_stampy ' . $params{'use_stampy'} .
         ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
+        ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
+        ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
@@ -282,6 +296,8 @@ if ($params{'cluster'} != 0) {
         ' --bwa_threads ' . $params{'bwa_threads'} .
         ' --use_stampy ' . $params{'use_stampy'} .
         ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
+        ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
+        ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
        "\n";
     }
 close OUT;
