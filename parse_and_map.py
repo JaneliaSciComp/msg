@@ -30,7 +30,7 @@ from cmdline.cmdline import CommandLineApp
 GEN_MD = True
 
 # Be verbose
-DEBUG = True
+DEBUG = False
 
 #############################
 
