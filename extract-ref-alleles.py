@@ -153,13 +153,15 @@ class App(CommandLineApp):
         print(sim_samfilename)
         print(sec_samfilename)
 
-        if self.options.bwa_alg.lower() == 'bwasw' or self.options.use_stampy:
-            #bwasw throws away bad reads so we can end up with different numbers in each read.
-            #we run this to remove any reads that are not in both.
-            # (Also use for STAMPY generated SAM files since the reads there also seem to differ.
-            sim_samfilepath, sec_samfilepath = self.remove_non_matching_reads(sim_samfilepath, sec_samfilepath,
-                True)
-            gc.collect()
+        #bwasw throws away bad reads so we can end up with different numbers in each read.
+        #we run this to remove any reads that are not in both.
+        # (Also use for STAMPY generated SAM files since the reads there also seem to differ.
+        # You will also need to run this if you quality trim the alignments.
+        # I simply always run it, but if you're running bwa aln, and don't quality trim the alignments
+        # you could save some time by not running it.
+        sim_samfilepath, sec_samfilepath = self.remove_non_matching_reads(sim_samfilepath, sec_samfilepath,
+            True)
+        gc.collect()
         
         sim_samfile = self.open_as_pysam(sim_samfilepath)
         sec_samfile = self.open_as_pysam(sec_samfilepath)
