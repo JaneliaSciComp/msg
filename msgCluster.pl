@@ -58,7 +58,7 @@ open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
 while (<IN>) { chomp $_;
 	next if ($_ =~ /^\#/);
 	next unless ($_);
-	my ($key,$val) = split(/=/,$_);
+	my ($key,$val) = split(/=/,$_,2);
 	$params{Utils::strip($key)} = Utils::strip($val);
 } close IN;
 
