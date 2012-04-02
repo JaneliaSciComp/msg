@@ -6,7 +6,9 @@ use POSIX;
 
 $true = 1 ;
 $false = 0 ;
-$version = '0.0.1' ;
+#Read in version from version file
+$version = do { local( @ARGV, $/ ) = 'version' ; <> } ;
+
 sub system_call {
     print "\nstarted ".POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
     print "  @_\n" ;
