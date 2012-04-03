@@ -124,7 +124,7 @@ else {
     $params{'reads.filtered'} = $params{'reads'};
 }
 close OUT;
-system("chmod 755 msgRun0-0.sh");    
+&Utils::system_call("chmod 755 msgRun0-0.sh");    
 
 if (exists $params{'parent1_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
@@ -161,7 +161,7 @@ if (exists $params{'parent1_reads'}) {
     }
 	print OUT " || exit 100\n";
     close OUT;
-    system("chmod 755 msgRun0-1.sh");
+    &Utils::system_call("chmod 755 msgRun0-1.sh");
     $params{'parent1'} .= '.msg.updated.fasta';
 }
 
@@ -201,7 +201,7 @@ if (exists $params{'parent2_reads'}) {
     }    
 	print OUT " || exit 100\n";
     close OUT;
-    system("chmod 755 msgRun0-2.sh");
+    &Utils::system_call("chmod 755 msgRun0-2.sh");
     $params{'parent2'} .= '.msg.updated.fasta';
 }
 
@@ -227,7 +227,7 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
     " --parse_or_map parse-only || exit 100\n";
 close OUT;
-system("chmod 755 msgRun1.sh");
+&Utils::system_call("chmod 755 msgRun1.sh");
 
 
 ### Mapping & Plotting
@@ -301,7 +301,7 @@ if ($params{'cluster'} != 0) {
        "\n";
     }
 close OUT;
-system("chmod 755 msgRun2.sh");
+&Utils::system_call("chmod 755 msgRun2.sh");
 
 
 ####################################################################################################
@@ -312,63 +312,63 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 
 #Trim barcoded reads for quality (If not requested the .sh file is simply blank)
 if ($params{'cluster'} != 0) {
-    system("qsub -N msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-0.sh") ;
+    &Utils::system_call("qsub -N msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-0.sh") ;
 }
 else {
-    system("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+    &Utils::system_call("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
 }
 
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      system("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
-      system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
-      system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
-      system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
-      system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
+      &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
+      &Utils::system_call("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
+      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
    }
 
 } elsif ( exists $params{'parent1_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      system("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
-      system("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
-      system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
+      &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
+      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
    }
 
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-      system("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
-      system("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
-      system("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
-      system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
+      &Utils::system_call("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
+      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
    }
 }
 else { 
-   if ($params{'cluster'} != 0) { system("qsub -N msgRun1.$$ -hold_jid msgRun0-0.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
-   else { system("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
+   if ($params{'cluster'} != 0) { &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-0.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
+   else { &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
 }
 
 if ($params{'cluster'} != 0) {
-   system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
-   #system("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
-   system("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
-   system("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   &Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
+   #&Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
+   &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
-   system("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
+   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
    #Cleanup - move output files to folders, remove barcode related files
-   system("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
-   system("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
-   system("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
-   system("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   &Utils::system_call("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
+   &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
+   &Utils::system_call("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
-   system("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
+   &Utils::system_call("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
    #Cleanup - move output files to folders, remove barcode related files
-   system("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
+   &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
 }
 
 print "\nNOTE: Output and error messages are located in: msgOut.$$ and msgError.$$ \n\n";
