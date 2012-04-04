@@ -115,8 +115,14 @@ close OUT;
 open (OUT,'>msgRun0-0.sh');
 if ($params{'quality_trim_reads_thresh'} > 0) {
     $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
-    print OUT "python msg/TQSfastq.py" . " -f " . $params{'reads'} . " -t " . $params{'quality_trim_reads_thresh'} .
-            " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'};
+    if (-e $params{'reads.filtered'}) {
+        #just leave msgRun0-0.sh blank for consistancy
+        print "Skipping quality trim step since $params{'reads.filtered'} already exists\n";
+    }
+    else {
+        print OUT "python msg/TQSfastq.py" . " -f " . $params{'reads'} . " -t " . $params{'quality_trim_reads_thresh'} .
+                " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'};
+    }
 }
 else {
     #just leave msgRun0-0.sh blank for consistancy
