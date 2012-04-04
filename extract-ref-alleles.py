@@ -234,8 +234,8 @@ class App(CommandLineApp):
             seq_forward = dict(zip(species, [Seq(read[sp].seq, IUPAC.ambiguous_dna) for sp in species]))
             if par2_flag != par1_flag:
                 seq_forward['par2'] = seq_forward['par2'].reverse_complement()
-        
-            if str(seq_forward[sp]) != str(seq_forward[sp]):
+
+            if str(seq_forward['par1']) != str(seq_forward['par2']):
                 print read.qname
                 print seq_forward['par1']
                 print seq_forward['par2']
@@ -249,19 +249,18 @@ class App(CommandLineApp):
             else:
                 try:
                     one_best_match = read['par1'].opt('X0') == 1 and read['par2'].opt('X0') == 1
-                    no_subpoptimal_matches = read['par1'].opt('X1') == 0 and read['par2'].opt('X1') == 0
+                    no_suboptimal_matches = False
+                    try: no_suboptimal_matches = read['par1'].opt('X1') == 0 and read['par2'].opt('X1') == 0
+                    except: no_suboptimal_matches = read['par1'].opt('XT')=='U' and read['par1'].opt('XT')=='U'                    
                     mds_same          = read['par1'].opt('MD') == read['par2'].opt('MD')
                     cigars_same       = read['par1'].cigar == read['par2'].cigar
                     both_species_same = read['par1'].opt('NM') == 0 and read['par2'].opt('NM') == 0
-                    if both_species_same: assert(mds_same and cigars_same)
-                    indels            = any([read[sp].opt('XO') > 0 or read[sp].opt('XG') > 0 
-                                             for sp in species])
-            
-                    ok = one_best_match and no_subpoptimal_matches
-                    #ok = one_best_match and no_subpoptimal_matches and not indels
-                         ## and not both_species_same
+                    if both_species_same: assert(mds_same and cigars_same), "mds and cigars not the same"
+                    indels            = any([read[sp].opt('XO') > 0 or read[sp].opt('XG') > 0 for sp in species])
+                    ok = one_best_match and no_suboptimal_matches
 
-                except: ## KeyError or assert
+                except (KeyError, AssertionError), e:
+                    print 'Possible tag missing: %s %s' % (read['par1'].qname, e)
                     ok = False
 
             if ok:
