@@ -385,11 +385,13 @@ sub readFasta {
     my ($read,$seq);
     open(FILE,$file) || die "ERROR (msgCluster): Can't open $file: $!\n";
     while (<FILE>) { chomp $_;
-		     if ($_ =~ /^>(\S+)/) {
-			 $reads{$read} = length($seq) if ($seq);
-			 $read = $1;
-			 $seq = '';
-		     } else { $seq .= $_; }
+        if ($_ =~ /^>(\S+)/) {
+            #If we don't have a previous read to save then something went wrong, check first
+            if ($seq && !$read) {die "Invalid FASTA file: @_";}
+            $reads{$read} = length($seq) if ($seq);
+            $read = $1;
+            $seq = '';
+        } else { $seq .= $_; }
     } close FILE;
     $reads{$read} = length($seq) if ($read);
 
