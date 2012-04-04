@@ -2,17 +2,13 @@
 use File::Basename;
 use File::Copy;
 use Getopt::Long ;
-use POSIX;
+use lib qw(./msg .);
+use Utils;
 
 $true = 1 ;
 $false = 0 ;
-$version = '0.0.1' ;
-sub system_call {
-    print "\nstarted ".POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
-    print "  @_\n" ;
-    system("@_") == 0 or die "Error in @_: $?" ;
-    print 'ended '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
-}
+#Read in version from version file
+$version = do { local( @ARGV, $/ ) = './msg/version' ; <> } ;
 
 $src = dirname $0 ;
 $update_genomes = $false ;
@@ -144,7 +140,7 @@ sub run_stampy_on_cluster {
     #to be safe so I took it out.  (reference: http://seqanswers.com/forums/showthread.php?t=15363)
     
     #run it
-    &system_call("qsub", "-t 1-${stampy_pseudo_threads}:1", $addl_qsub_option_for_pe, 
+    &Utils::system_call("qsub", "-t 1-${stampy_pseudo_threads}:1", $addl_qsub_option_for_pe, 
         "-N msgRun0-$sp-stampy.$$", "-V", "-sync y", "-cwd", "-b y",
         "./msgRun0-$sp-stampy.sh");
     
@@ -152,19 +148,19 @@ sub run_stampy_on_cluster {
     #merge all of the temp files back together
     my @tmp_bam_file_names;
     for (1..$stampy_pseudo_threads) {push(@tmp_bam_file_names, "$out.tmp.$_.bam");}
-    &system_call("samtools merge $out.stampy.tmp.bam " . join(" ", @tmp_bam_file_names));
+    &Utils::system_call("samtools merge $out.stampy.tmp.bam " . join(" ", @tmp_bam_file_names));
     #convert back to SAM format
-    &system_call("samtools view -h -o $out.sam $out.stampy.tmp.bam");
+    &Utils::system_call("samtools view -h -o $out.sam $out.stampy.tmp.bam");
     
     #delete temp files and qsub rubbish
     if (!$DEBUG_MODE) {
         unlink("$out.stampy.tmp.bam");
-        &system_call("rm -f $out.tmp.*");
+        &Utils::system_call("rm -f $out.tmp.*");
     }
     unless(-e 'stampy_logs' or mkdir 'stampy_logs') {
         die "Unable to create stampy_logs\n";
     }
-    &system_call("mv -f msgRun0-$sp-stampy.* stampy_logs");
+    &Utils::system_call("mv -f msgRun0-$sp-stampy.* stampy_logs");
 }
 
 ## -------------------------------------------------------------------------------
@@ -206,26 +202,26 @@ if( $update_genomes ) {
         
         #Trim reads if required (you could run this conncurrently while trimming barcoded reads for a speed up in the future.)
         if ($quality_trim_reads_thresh > 0) {            
-            &system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
+            &Utils::system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
                 "-c",$quality_trim_reads_consec,"-q","-o",$reads_for_updating_fq{$sp});
             $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq';
         }
     
-        &system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
+        &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
     
         $out = "update_reads-aligned-$sp" ;
         unless( -e "$out.pileup" ) {
             #Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
-            &system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
+            &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
                 unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-            &system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
+            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
     
             unless (-e "$out.sam") {
                 if ($use_stampy == 1) {
                     #Build stampy genome file
-                    &system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg") ;
+                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg") ;
                     #Build stampy hash file
-                    &system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg") ;
+                    &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg") ;
                     #Call stampy mapping with or without bwa
                     my $bwa_options = "";
                     if ($stampy_premap_w_bwa == 1) {
@@ -236,54 +232,54 @@ if( $update_genomes ) {
                     }
                     else {
                         #Standard Stampy run w/o qsub
-                        &system_call("stampy.py", $bwa_options, 
+                        &Utils::system_call("stampy.py", $bwa_options, 
                             "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", 
                             "--substitutionrate", $parent_stampy_substitution_rate,
                             "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam") ;
                     }                    
                 }
                 elsif ($bwa_alg eq 'aln') {
-                    &system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
-                    &system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
+                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
                 elsif ($bwa_alg eq 'bwasw') {
-                    &system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
                 else {die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln or bwasw (or set use_stampy=1)";}
 
             }
             # Filter out unmapped reads, etc
-            &system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
+            &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
             if ($parent_mapq_filter > 0) {
-                &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam");
+                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam");
             }
             else {
-                &system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam");
+                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam");
             }
-            &system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
+            &Utils::system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
             
             if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
                 if ($DEBUG_MODE == $true) {
-                    &system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
+                    &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
                 }
                 #Put back in MD tags, bwasw and stampy omit them:
-                &system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
+                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
                 if ($DEBUG_MODE == $true) {
                     #copy instead of move for debug mode so we can view each step
-                    &system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
+                    &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
                 }
                 else {
                     #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
-                    &system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam")
+                    &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam")
                 }
             }
-            &system_call("samtools", "index", "$out.bam.sorted.bam") ;
-            &system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
+            &Utils::system_call("samtools", "index", "$out.bam.sorted.bam") ;
+            &Utils::system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
 
         }
 
         #Update the parent genome with the newly mapped reads
-		&system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
+		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
             $max_coverage_exceeded_state, $max_coverage_stds);
 		unlink("$genomes_fa{$sp}.msg");
 						
@@ -307,7 +303,7 @@ for $sp (keys %genomes_fa) {
 	
 	if ($parse_or_map eq 'parse-only') {
 		### reformat for samtools (60 chars per line)
-		&system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa") unless (-e "${sp}_ref.fa") ;
+		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa") unless (-e "${sp}_ref.fa") ;
 	}
 }
 
@@ -327,9 +323,9 @@ foreach $sp ( keys %genomes ) {
 		#When mapping with stampy, perform the genome and hash building steps here
         if ($use_stampy == 1) {
             #Build stampy genome file
-            &system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}) ;
+            &Utils::system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}) ;
             #Build stampy hash file
-            &system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
+            &Utils::system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
                 "$genomes_fa{$sp}.stampy.msg") ;
         }
 	}
@@ -340,7 +336,7 @@ foreach $sp ( keys %genomes ) {
 # called by msgRun1 with parse only)
 $samfiles_dir = basename($raw_read_data) . "_sam_files" ;
 mkdir $samfiles_dir unless (-d $samfiles_dir);
-&system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
+&Utils::system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
        '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
         $bwa_alg, '--bwa_threads', $bwa_threads, 
@@ -367,7 +363,7 @@ if ($parse_or_map eq '--map-only') {
    	my $indiv = 'indiv' . $bc_bits[1] . '_' . $bc_bits[0];
       print "\t$indiv\n";
    
-   	&system_call('bash', "$src/parent1or2-hmm.sh",
+   	&Utils::system_call('bash', "$src/parent1or2-hmm.sh",
    			 '-b', $barcodes,
    			 '-s', $samfiles_dir,
    			 '-o', 'hmm_data',
