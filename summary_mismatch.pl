@@ -20,6 +20,8 @@ open BC, $barcodefile or die "wrong format for barcodefile\n";
 my @barcodes = (); 
 while (my $line = <BC>) {
     my @rows = split('\t', $line);
+    #remove any line endings since I believe windows line endings can appear and wreak havoc.
+    $rows[1] =~ s/\r?\n?$//;
     my $barcodename = "indiv".$rows[1]."_".$rows[0];
     push(@barcodes, $barcodename);
 }
