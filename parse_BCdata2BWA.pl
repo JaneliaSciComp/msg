@@ -7,6 +7,9 @@ $" = "\n";
 my $msg_src = dirname $0 ;
 my $verbose = 0;
 
+# updated Greg Pinero April 2012
+# - added Tn5-IonTorrent
+
 # version 10 (02.25.10)
 # - added more restriction enzymes
 # - changed linker processing
@@ -116,6 +119,10 @@ my $seq_start = $BC_length;
 #							NNNNNN T  nnnnnn  GATCGGAAGAGCTCGTATGCCGTCTTCTGCTTG	GA TCGGAAGAG CTCGTATGCCGTCTTCTGCTTG (if filled by Klenow) 
 # ButtFinch_PE_vI		NNNG   TA cnnn    GATCGGAAGAGCGGTTCAGCAGGAATGCCGA		GA TCGGAAGAG CGGTTCAGCAGGAATGCCGA 
 # ButtFinch_PE_vII	NNNi      nnn     GATCGGAAGAGCGGTTCAGCAGGAATGCCGAG		GA TCGGAAGAG CGGTTCAGCAGGAATGCCGAG
+# Tn5-IonTorrent    NNNNNN AGATGTGTATAAGAGACAG some seq CTGTCTCTTATACACATCTATCACCGACTGCCCATAGAGAGGAAAGCGGAGGCGTAGTGG
+#   barcode 19bp-transposon-end the-seqn-we-want  reverse-complement-of-linker-P1
+#   i.e barcode barcode_addon  NO OVERHANG! FC1_linker_seq
+#   NNNNNN AGATGTGTATAAGAGACAG some seq CTGTCTCTTATACACATCTATCACCGACTGCCCATAGAGAGGAAAGCGGAGGCGTAGTGG
 
 ### FC1_overhang === overhang selected for RE cut site
 ### overhang === overhang that gets sequenced (dependent on blunt ligation)
@@ -131,6 +138,8 @@ switch ($linker_type) {
 	case 'ButtFinch_PE_vI'	{			$barcode_addon = 'G'; $FC1_overhang = 'TA'; $overhang = 'TA'; $FC1_linker_seq = 'GATCGGAAGAGCGGTTCAGCAGGAATGCCGA'; }
 	case 'ButtFinch_PE_vII'	{			$barcode_addon = '';  $FC1_overhang = 'T';  $overhang = '';	  $FC1_linker_seq = 'GATCGGAAGAGCGGTTCAGCAGGAATGCCGAG'; } 
 	case 'ButtFinch_PE_vII_ANA'	{	$barcode_addon = '';  $FC1_overhang = 'T';  $overhang = '';	  $FC1_linker_seq =   'TCGGAAGAGCGGTTCAGCAGGAATGCCGAG'; } # GA became part of barcode
+	case 'Tn5-IonTorrent'	{		$barcode_addon = 'AGATGTGTATAAGAGACAG';  $FC1_overhang = '';  $overhang = ''; 
+	    $FC1_linker_seq = 'CTGTCTCTTATACACATCTATCACCGACTGCCCATAGAGAGGAAAGCGGAGGCGTAGTGG'; }
 	else							{			die "ERROR: Unknown linker_type: $linker_type\n"; }
 }  
 
@@ -161,6 +170,7 @@ if ($prepend_enz eq 'MseI')	{			$prepend_seq = 'T';					$RE_seq = 'TAA';		$RE_ov
 } elsif ($prepend_enz eq 'Hpy188III'){ $prepend_seq = 'TC';           	$RE_seq = 'nnGA';		$RE_overhang = -2;
 } elsif ($prepend_enz eq 'AhdI') {		$prepend_seq = 'GACnnn';       	$RE_seq = 'nnGTC';	$RE_overhang = 1;
 } elsif ($prepend_enz eq 'HpyAV') {		$prepend_seq = 'CCTTCnnnnnn';  	$RE_seq = '';			$RE_overhang = 1;
+} elsif ($prepend_enz eq 'null') {		$prepend_seq = '';  	$RE_seq = '';			$RE_overhang = 0;
 } else { die "ERROR: Unknown restriction enzyme ($prepend_enz)!\n"; }
 
 ### update RE_seq OR prepend_seq with the overhang
