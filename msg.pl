@@ -51,6 +51,8 @@ GetOptions(
     'parent_stampy_substitution_rate=f' => \$parent_stampy_substitution_rate,
     'indiv_mapq_filter=i' => \$indiv_mapq_filter,
     'parent_mapq_filter=i' => \$parent_mapq_filter,
+    'index_file=s' => \$index_file,
+    'index_barcodes=s' => \$index_barcodes,
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -88,6 +90,8 @@ print "indiv_stampy_substitution_rate $indiv_stampy_substitution_rate\n\n";
 print "parent_stampy_substitution_rate $parent_stampy_substitution_rate\n\n";
 print "indiv_mapq_filter $indiv_mapq_filter\n\n";
 print "parent_mapq_filter $parent_mapq_filter\n\n";
+print "index_file $index_file\n\n";
+print "index_barcodes $index_barcodes\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -342,7 +346,9 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
         $bwa_alg, '--bwa_threads', $bwa_threads, 
         '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa,
         '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
-        '--indiv_mapq_filter', $indiv_mapq_filter
+        '--indiv_mapq_filter', $indiv_mapq_filter, '--index_file', $index_file,
+        '--index_barcodes', $index_barcodes, '--quality_trim_reads_thresh', $quality_trim_reads_thresh,
+        '--quality_trim_reads_consec', $quality_trim_reads_consec
         ) ;
 
 ## Strip species out of reference column

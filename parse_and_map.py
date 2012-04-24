@@ -21,6 +21,7 @@ import time, datetime
 from mapping_functions import *
 from msglib import *
 from cmdline.cmdline import CommandLineApp
+import barcode_splitter
 
 ##### INTERNAL OPTIONS (for developers) ######
 
@@ -28,9 +29,6 @@ from cmdline.cmdline import CommandLineApp
 # It seems to be very slow to add these in, but it does affect the end result.  I'm not sure 
 # where though.
 GEN_MD = True
-
-# Be verbose
-DEBUG = False
 
 #############################
 
@@ -82,6 +80,15 @@ class ParseAndMap(CommandLineApp):
 
         op.add_option('--stampy_pseudo_threads', dest='stampy_pseudo_threads', type='int', default=0, 
                       help='Use qsub commands to split up stampy processes during mapping. NOT currently used.')
+        #!!
+        op.add_option('--debug', dest='debug', default=True, action='store_true', 
+                      help='More verbose output and leaves temporary files instead of cleaning up')
+
+        op.add_option('--quality_trim_reads_thresh', dest='quality_trim_reads_thresh', default=None, type='int',
+                      help='Illumina parsing only - what level should split files be quality trimmed at')
+                      
+        op.add_option('--quality_trim_reads_consec', dest='quality_trim_reads_consec', default=None, type='int',
+                      help='Illumina parsing only - Minimum number of consecutive bases passing threshold values')
 
         #Set divergence for mapping to a foreign reference (note: this is
         #strongly recommended for divergences >3%, as it will automatically
@@ -92,8 +99,13 @@ class ParseAndMap(CommandLineApp):
                       
         op.add_option('--indiv_mapq_filter', dest='mapq_filter', type='int', default=0, 
                       help='Filter out poor alignments.  Set this to 0 to skip.')
+                
+        #Illumina indexing only
+        op.add_option('--index_file', dest='index_file', type='string', default=None, 
+                      help='When using Illumina indexes, this is the fastq/fasta file with the indexes.')
+        op.add_option('--index_barcodes', dest='index_barcodes', type='string', default=None, 
+                      help='When using Illumina indexes, this the the file with a listing of index sequences and labels')
                       
-
     def main(self):
         print datetimenow()
         print bcolors.OKBLUE + 'parse_and_map version %s' % __version__ + bcolors.ENDC
@@ -126,7 +138,10 @@ class ParseAndMap(CommandLineApp):
         elif os.path.exists(self.parsedir):
             print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC
         else:
-            self.parse()
+            if self.options.index_file and self.options.index_barcodes:
+                self.parse_illumina_indexes()
+            else:
+                self.parse()
 
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
@@ -138,7 +153,71 @@ class ParseAndMap(CommandLineApp):
                 #bwasw and stampy don't make sai files    
                 self.delete_files()
 
-    def parse(self):
+    def parse_illumina_indexes(self):
+        """
+        When the illumina index system is used.  We have 3 input files: A normal fastq file with all of the reads,
+        a fastq with the same reference ids as the reads file but with the index as the sequence, and a small
+        indexes file that matches a sequence to an index label.
+        
+        
+        
+        """
+        prefix = 'index_parse'
+
+        #capture output
+        log = open(os.path.join(self.logdir, '%s.log' % (prefix)), "w")
+
+        def run_command(args):
+            print ' '.join(args)
+            sys.stdout.flush()
+            subprocess.check_call(args, shell=True, stdout=log, stderr=log)
+
+        #Mkdir output directory
+        os.path.mkdir(self.parsedir)
+
+        #call barcode_splittler.py to break up by illumina indexes
+
+        args = [os.path.join(os.path.dirname(__file__), "barcodes_splitter.py"), 
+                  '--bcfile', self.options.index_barcodes,
+                  '--prefix', prefix,
+                  '--idxread 1', self.options.index_file, raw_data ]
+        run_command(args)
+
+        #Gather and process output files
+        barcodes_dict = barcode_splitter.read_barcodes(self.options.index_barcodes) #id by seq
+        for index_id, index_seq in barcodes_dict.items():
+            #Ignore all of the *_1 files because they came from illumina index fastq file 
+            expected_file_name = "%s%s_read_2" % (prefix, index_id)
+            assert os.path.exists(expected_file_name)
+            
+            #Optionally quality trim the remaining files
+            if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
+                args = [os.path.join(os.path.dirname(__file__), "barcodes_splitter.py"), 
+                          '--bcfile', self.options.index_barcodes,
+                          '--prefix', prefix,
+                          '--idxread 1', self.options.index_file, raw_data ]
+                run_command(args)
+            
+            #Process remaining files through regular MSG parser
+            self.parse(expected_file_name)
+            expected_msg_parse_dir = expected_file_name + '_parsed'
+            
+            #Copy relevant parsed files to output directory (rename??)
+
+
+            #delete the output from regular msg parser
+        
+        
+        #Copy original barcodes file
+        
+        #Update barcodes file with new names for the rest of the msg run to use
+            
+        #Clean up
+        if not self.options.debug:
+            #delete the barcode_splitter output reads files
+            subprocess.check_call("rm %s*_read_*" % prefix, shell=True)
+
+    def parse(self, use_raw_data_file=None):
 
         # Convert Illumina reads to format for BWA - Peters program does not create a new file,
         # instead it writes to existing files. So first need to remove the older files.
@@ -149,8 +228,10 @@ class ParseAndMap(CommandLineApp):
             for ind in self.bc:
                 fastq_file = 'indiv' + ind[1] + '_' + ind[0]
                 os.remove("./" + fastq_file)
+
+        raw_data = use_raw_data_file or self.options.raw_data_file
     
-        print "Parsing data into individual barcode files"
+        print "Parsing data (%s) into individual barcode files" % raw_data
 
     ## USAGE: parse_BCdata2BWA.pl version 11
     ##    fastq_file
@@ -184,7 +265,6 @@ class ParseAndMap(CommandLineApp):
     ##    -a assign barcode if first n-1 bps are nonredundant [0]
     ##    -c convert individual fastq files into fasta [0]
     
-        raw_data = self.options.raw_data_file
         args = ["perl", os.path.join(os.path.dirname(__file__), "parse_BCdata2BWA.pl"), 
                   '-b', self.options.barcodes_file,
                   '-e', self.options.re_cutter,
@@ -399,7 +479,7 @@ class ParseAndMap(CommandLineApp):
                 raise ValueError("Not using stampy and invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
    
             #After updating files with options below, should we keep the intermediate version around:
-            put_back_command = DEBUG and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
+            put_back_command = self.options.debug and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
             if self.options.mapq_filter:
                 # remove poor alignments if requested
                 for (sam_file, log_file) in ((aln_par1_sam,file_par1_log), (aln_par2_sam,file_par2_log)):
