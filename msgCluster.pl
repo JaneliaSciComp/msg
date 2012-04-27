@@ -52,6 +52,8 @@ my %params = (
         indiv_mapq_filter => '0',
         parent1_mapq_filter => '0',
         parent2_mapq_filter => '0',
+        index_file => '',
+        index_barcodes => '',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -112,8 +114,9 @@ foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; }
 close OUT;
 
 #Trim barcoded reads for quality if required, set reads.filtered paramater which all downstream calculations will look at.
+# (skip this step for illumina indexed reads.  We will do it after splitting the indexes.)
 open (OUT,'>msgRun0-0.sh');
-if ($params{'quality_trim_reads_thresh'} > 0) {
+if (($params{'quality_trim_reads_thresh'} > 0) && (!$params{'index_file'}) && (!$params{'index_barcodes'})) {
     $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
     if (-e $params{'reads.filtered'}) {
         #just leave msgRun0-0.sh blank for consistancy
@@ -231,10 +234,25 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --parent2 ' . $params{'parent2'} .
     ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
     ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
-    " --parse_or_map parse-only || exit 100\n";
+    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
+    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
+    " --parse_or_map parse-only";
+if ($params{'index_file'} && $params{'index_barcodes'}) {
+    print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
+}
+print OUT " || exit 100\n";
+    
 close OUT;
 &Utils::system_call("chmod 755 msgRun1.sh");
 
+### Replace barcodes file if using Illumina indexing since we will now have num indexes * num barcodes 
+### barcoded individuals from parsing step
+if ($params{'index_file'} && $params{'index_barcodes'}) {
+    &Utils::system_call(
+        "python msg/barcode_splitter.py --make_indexed_msg_barcodes_file --msg_barcodes " . $params{'barcodes'} .
+        " --bcfile " . $params{'index_barcodes'});
+    $params{'barcodes'} = $params{'barcodes'} . '.after.index.parsing';
+}
 
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file

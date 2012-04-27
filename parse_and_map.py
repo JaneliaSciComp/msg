@@ -16,11 +16,13 @@ __version__ = '0.3.0'
 
 import subprocess
 import sys, os
+import shutil
 import glob
 import time, datetime
 from mapping_functions import *
 from msglib import *
 from cmdline.cmdline import CommandLineApp
+import barcode_splitter
 
 ##### INTERNAL OPTIONS (for developers) ######
 
@@ -28,9 +30,6 @@ from cmdline.cmdline import CommandLineApp
 # It seems to be very slow to add these in, but it does affect the end result.  I'm not sure 
 # where though.
 GEN_MD = True
-
-# Be verbose
-DEBUG = False
 
 #############################
 
@@ -82,6 +81,15 @@ class ParseAndMap(CommandLineApp):
 
         op.add_option('--stampy_pseudo_threads', dest='stampy_pseudo_threads', type='int', default=0, 
                       help='Use qsub commands to split up stampy processes during mapping. NOT currently used.')
+        
+        op.add_option('--dbg', dest='debug', default=False, action='store_true', 
+                      help='More verbose output and leaves temporary files instead of cleaning up')
+
+        op.add_option('--quality_trim_reads_thresh', dest='quality_trim_reads_thresh', default=None, type='int',
+                      help='Illumina parsing only - what level should split files be quality trimmed at')
+                      
+        op.add_option('--quality_trim_reads_consec', dest='quality_trim_reads_consec', default=None, type='int',
+                      help='Illumina parsing only - Minimum number of consecutive bases passing threshold values')
 
         #Set divergence for mapping to a foreign reference (note: this is
         #strongly recommended for divergences >3%, as it will automatically
@@ -92,8 +100,13 @@ class ParseAndMap(CommandLineApp):
                       
         op.add_option('--indiv_mapq_filter', dest='mapq_filter', type='int', default=0, 
                       help='Filter out poor alignments.  Set this to 0 to skip.')
+                
+        #Illumina indexing only
+        op.add_option('--index_file', dest='index_file', type='string', default=None, 
+                      help='When using Illumina indexes, this is the fastq/fasta file with the indexes.')
+        op.add_option('--index_barcodes', dest='index_barcodes', type='string', default=None, 
+                      help='When using Illumina indexes, this the the file with a listing of index sequences and labels')
                       
-
     def main(self):
         print datetimenow()
         print bcolors.OKBLUE + 'parse_and_map version %s' % __version__ + bcolors.ENDC
@@ -126,7 +139,10 @@ class ParseAndMap(CommandLineApp):
         elif os.path.exists(self.parsedir):
             print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC
         else:
-            self.parse()
+            if self.options.index_file and self.options.index_barcodes:
+                self.parse_illumina_indexes()
+            else:
+                self.parse()
 
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
@@ -138,7 +154,108 @@ class ParseAndMap(CommandLineApp):
                 #bwasw and stampy don't make sai files    
                 self.delete_files()
 
-    def parse(self):
+    def create_symlink(self, file_path, shortcut_path):
+        sym_link_args = 'ln -s %s %s.fq' % (file_path, shortcut_path)
+        print "create ln with .fq extension:", sym_link_args
+        subprocess.check_call([sym_link_args], shell=True)
+
+    def parse_illumina_indexes(self):
+        """
+        When the illumina index system is used.  We have 3 input files: A normal fastq file with all of the reads,
+        a fastq with the same reference ids as the reads file but with the index as the sequence, and a small
+        indexes file that contains a label for each index sequence.
+        
+        This method calls barcodes_splitter.py which will parse out each index into the working directory.
+        The strategy here is to grab the relevant files output from barcodes_splitter.py and call the
+        standard issue MSG parser on each of them
+        and then move and rename those results to where/what MSG would expect.   Also note msgCluster.pl calls the 
+        make_msg_barcodes_file function in barcode_splitter to create an updated barcodes file 
+        at startup so downstream MSG programs know where to find the parsed data.
+        """
+        print "Starting illumina index parse"
+        prefix = 'index_parse' #used to keep track of index parsing output files
+
+        #capture output here
+        log = open(os.path.join(self.logdir, '%s.log' % (prefix)), "w")
+
+        def run_command(args):
+            """simple boilerplate to run commands"""
+            print ' '.join(args)
+            #suproccess.check_call failed silently when this was run from qsub using a 
+            #list as args, so I join it into a string which seems to work everywhere.
+            subprocess.check_call(' '.join(args), shell=True, stdout=log, stderr=log)
+
+        #Mkdir output directory
+        if not os.path.exists(self.parsedir):
+            os.mkdir(self.parsedir)
+
+        #call barcode_splitter.py to break up by illumina indexes
+
+        args = ['python', os.path.join(os.path.dirname(__file__), "barcode_splitter.py"), 
+                  '--bcfile', str(self.options.index_barcodes),
+                  '--prefix', prefix,
+                  '--idxread 1', self.options.index_file, self.options.raw_data_file ]
+        run_command(args)
+        
+        #Gather and process output files
+        barcodes_dict = barcode_splitter.read_barcodes(self.options.index_barcodes) #id by seq
+        for index_id in set(barcodes_dict.values()):
+            #Ignore all of the *_1 files because they came from illumina index fastq file 
+            expected_file_name = "%s%s_read_2" % (prefix, index_id)
+            print "processing file",expected_file_name
+            assert os.path.exists(expected_file_name)
+            
+            #Optionally quality trim the files
+            if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
+                args = [os.path.join(os.path.dirname(__file__), "TQSfastq.py"), 
+                          '-f', expected_file_name, '-t', str(self.options.quality_trim_reads_thresh),
+                          '-c', str(self.options.quality_trim_reads_consec), '-q', '-o', expected_file_name]
+                run_command(args)
+                if not self.options.debug:
+                    os.remove(expected_file_name)
+                expected_file_name += '.trim.fastq'
+            
+            #Process file through regular MSG parser
+            self.parse(expected_file_name)
+            expected_msg_parse_dir = expected_file_name + '_parsed' #this is where it will put the parsed files
+            
+            #Copy parsed files to output directory and rename files to denote which index they came from
+            def make_new_name(old_name, index_id):
+                """example rename for an illumina index called "standard"
+                indivA12_AATAAG -> indivA12standard_AATAAG
+                Note that barcode_splitter.make_msg_barcodes_file expects the file 
+                names to be in this format, so update that too if changing naming here.
+                """
+                if old_name.startswith('indiv'):
+                    parts = old_name.split('_')
+                    return parts[0] + index_id + '_' + parts[1]
+                else:
+                    return old_name + '_' + index_id
+                    
+            for fn in os.listdir(expected_msg_parse_dir):
+                #Skip .fq files since we assume they are symlinks. (this gets hairy).  
+                #Explanation: The MSG parser created symbolic links to each file appending an .fq so
+                #stampy can process them.  Since we're renaming the files we need to not copy the symlinks and later recreate them
+                if not fn.endswith('.fq'):
+                    #example rename indivA12_AATAAG -> indivA12standard_AATAAG
+                    new_name = make_new_name(fn, index_id)
+                    shutil.copy(os.path.join(expected_msg_parse_dir, fn), os.path.join(self.parsedir, new_name))
+                    #Recreate symlink we didn't copy
+                    if fn.startswith('indiv'):
+                        #ln trivia: symlink target should be relative to sym link, not where you are.
+                        shortcut = os.path.join(self.parsedir, new_name)
+                        self.create_symlink(new_name, shortcut)
+                
+            #delete the output from regular msg parser
+            if not self.options.debug:
+                shutil.rmtree(expected_msg_parse_dir)
+        
+        #Clean up
+        if not self.options.debug:
+            #delete the barcode_splitter output reads files
+            subprocess.check_call("rm %s*_read_*" % prefix, shell=True)
+
+    def parse(self, use_raw_data_file=None):
 
         # Convert Illumina reads to format for BWA - Peters program does not create a new file,
         # instead it writes to existing files. So first need to remove the older files.
@@ -149,42 +266,10 @@ class ParseAndMap(CommandLineApp):
             for ind in self.bc:
                 fastq_file = 'indiv' + ind[1] + '_' + ind[0]
                 os.remove("./" + fastq_file)
-    
-        print "Parsing data into individual barcode files"
 
-    ## USAGE: parse_BCdata2BWA.pl version 11
-    ##    fastq_file
-    ##    dir_name
-    ##    enzyme(MseI/NdeI/Hpy188I/0=null)
-    ##    prepend(0|1)
-    ##    barcode_file
-    ##    ignored_barcode_file(null)
-    ##    linker_type(Dros_SR_vI|Dros_SR_vII|Dros_SR_vIII_T_overhang|Dros_SR_vIII_blunt|ButtFinch_PE_vI|ButtFinch_PE_vII)
-    ##    convert_QV(0|1)
-    ##    strict(0|1)
-    ##    minQV(default=0)
-    ##    assign barcode if first n-1 bps are nonredundant(default=0)
-    ##     when strict = 0,
-    ##         junk = sequences < 20bp and sequences with mononucleotide runs >8
-    ##      when strict = 1,
-    ##          the sequences are also checked to all start with the correct bases (corresponding to the RE used)
-    ##          and dumped to junk if they don't start with the right base(s)
-    ##
-    ##  The following should be provided in the barcodes file
-    ##  sp1  sp2  enzyme  prepend  linker_type  convert_QV  strict  minQV
-
-    ## OPTIONS: 04.05.11
-    ##    -e restriction enzyme used for digestion [MseI|NdeI|Hpy188I|null]
-    ##    -p prepend bases to reads to complete the RE motif (useful for mapping reads) [0|1]
-    ##    -b barcode file [barcode_file]
-    ##    -i file of barcodes to ignore [null]
-    ##    -l linker system used [Dros_SR_vI|Dros_SR_vII|Dros_SR_vIII_T_overhang|Dros_SR_vIII_blunt|ButtFinch_PE_vI|ButtFinch_PE_vII]
-    ##    -s strict (only retain reads with the correct RE motif) [0|1]
-    ##    -m minimum QV to mask from the 3' end [0]
-    ##    -a assign barcode if first n-1 bps are nonredundant [0]
-    ##    -c convert individual fastq files into fasta [0]
+        raw_data = use_raw_data_file or self.options.raw_data_file
     
-        raw_data = self.options.raw_data_file
+        print "Parsing data (%s) into individual barcode files" % raw_data
         args = ["perl", os.path.join(os.path.dirname(__file__), "parse_BCdata2BWA.pl"), 
                   '-b', self.options.barcodes_file,
                   '-e', self.options.re_cutter,
@@ -232,9 +317,7 @@ class ParseAndMap(CommandLineApp):
             #TEMP - make sym links to parsed fq files with .fq extensions to they can run in stampy
             #Later versions of stampy will hopefully fix this so we can remove it.
             #ln trivia: symlink target should be relative to sym link, not where you are.
-            sym_link_args = 'ln -s %s %s.fq' % (file_name, fastq_file)
-            print "create ln with .fq extension:", sym_link_args
-            subprocess.check_call([sym_link_args], shell=True)
+            self.create_symlink(file_name, fastq_file)
                 
         stats_file.write('total_reads\t%s' %(total_reads))
         stats_file.close()
@@ -399,7 +482,7 @@ class ParseAndMap(CommandLineApp):
                 raise ValueError("Not using stampy and invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
    
             #After updating files with options below, should we keep the intermediate version around:
-            put_back_command = DEBUG and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
+            put_back_command = self.options.debug and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
             if self.options.mapq_filter:
                 # remove poor alignments if requested
                 for (sam_file, log_file) in ((aln_par1_sam,file_par1_log), (aln_par2_sam,file_par2_log)):
