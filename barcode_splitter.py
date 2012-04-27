@@ -9,6 +9,7 @@ import optparse
 import os
 import re
 import sys
+import mapping_functions
 #from fastq_utils import fastq_utils
 
 __version__ = "0.1"
@@ -20,6 +21,7 @@ __license__ = "BSD 2-Clause License http://www.opensource.org/licenses/BSD-2-Cla
 UNMATCHED = 'unmatched'
 
 def main (argv=None):
+    print "barcode_splitter starting run"
     if argv is None:
         argv = sys.argv
     
@@ -28,6 +30,18 @@ def main (argv=None):
     parser.add_option ('-v', '--verbose', action='store_true', default=False, help='verbose output')
     
     parser.add_option ('--bcfile', help='Tab delimited file with barcodes and sample ids (REQUIRED)')
+    
+    
+    #When used in MSG (Multiplexed shotgun sequencing) the illumina indexes will be parsed out first
+    #and those results will be passed through the MSG parser to find the MSG barcodes.  Since each index
+    #will have the same barcodes, the MSG parser renames the results with the index.  
+    #This option group creates a new barcodes file for MSG to use downstream from parsing with the updated
+    #names.
+    msg_group = optparse.OptionGroup(parser, "MSG Options")
+    msg_group.add_option ('--make_indexed_msg_barcodes_file',help='If you have a MSG barcodes file, this creates a new version of it with indexes',
+        action='store_true', default=False)
+    msg_group.add_option ('--msg_barcodes', help="Tab delimited seq/label list of MSG barcodes", default='')
+    parser.add_option_group(msg_group)
     
     output_group = optparse.OptionGroup(parser, "Output Options")
     output_group.add_option ('--prefix', default='', help='Prefix for output files')
@@ -51,12 +65,15 @@ def main (argv=None):
     
     try:
         (options, args) = parser.parse_args(argv[1:])
-        if len(args) < 1:
+        if (not options.make_indexed_msg_barcodes_file) and len(args) < 1:
             parser.error('Must specify at least one sequence file')
         if not options.bcfile:
             parser.error('Must specify a barcodes file with "--bcfile" option')
     except SystemExit: # Prevent exit when calling as function
         return 2
+    
+    if options.make_indexed_msg_barcodes_file and options.msg_barcodes:
+        return make_msg_barcodes_file(options.msg_barcodes, options.bcfile)
     
     # Read barcodes files into dict
     barcode_dict = read_barcodes(options.bcfile)
@@ -134,7 +151,7 @@ def main (argv=None):
     for barcode in sorted(barcode_dict, key=barcode_dict.get):
         print "%s\t%s\t%s\t%.2f%%" % (barcode_dict[barcode], barcode, counts[barcode], (counts[barcode]/total_read_count)*100 )
     print "%s\t%s\t%s\t%.2f%%" % (UNMATCHED, None, counts[UNMATCHED], (counts[UNMATCHED]/total_read_count)*100 )
-    return 1
+    return 0
 
 def read_barcodes(filename):
     '''Read barcodes file into dictionary'''
@@ -151,6 +168,24 @@ def read_barcodes(filename):
             else:
                 raise Exception("Unable to read barcode from line %s: '%s'" % (linenum, line))
     return barcode_dict
+
+def make_msg_barcodes_file(msg_barcodes, bcfile):
+    """
+    When used in MSG (Multiplexed shotgun sequencing) the illumina indexes will be parsed out first
+    and those results will be passed through the MSG parser to find the MSG barcodes.  Since each index
+    will have the same barcodes, the MSG parser renames the results with the index.  
+    This function creates a new barcodes file for MSG to use downstream from parsing with the updated
+    names.
+    """
+    new_barcodes = open(msg_barcodes + '.after.index.parsing','w')
+    for index_id in read_barcodes(bcfile).values():
+        for ind in mapping_functions.read_barcodes(msg_barcodes):
+            #For reference, MSG parsing output file_name is composed of: 'indiv' + ind[1] + '_' + ind[0]
+            new_ind = ind[:]
+            new_ind[1] = new_ind[1] + index_id
+            new_barcodes.write('\t'.join(new_ind) + '\n')
+    new_barcodes.close()  
+    return 0
 
 def match_barcodes(sequence, barcodes, mismatches):
     '''Find closest match(es) in barcodes to specified sequence with max number of mismatches'''

@@ -499,6 +499,7 @@ sub printout {
 
 	foreach my $key (keys %{$BC_table}) {
 		my $id = $$BC_table{$key};
+		#Warning: parse_and_map.py expects these files to start with "indiv" so careful changing that
 		open (OUT, ">>$dir/indiv${id}_${key}"); 
 		print OUT "@{$BC_arrays{$BC_table{$key}}}\n" if (@{$BC_arrays{$BC_table{$key}}});
 		@{$BC_arrays{$BC_table{$key}}} = ();

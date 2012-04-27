@@ -58,7 +58,8 @@ def verify_all_barcodes_got_important_files(barcodes):
             for line in stdout.splitlines():
                 size = line.split()[4]
                 if int(size)<2000:
-                    raise ValueError("File mentioned in this line is too small: " + line)
+                    err_msg = "File mentioned in this line is unexpectedly small: " + line
+                    sys.stderr.write(err_msg + '\n')
 
 def validate_output_files(barcode_files_path):
     barcodes = set([re.split(r'\s+',line)[0] for line in open(barcode_files_path)])

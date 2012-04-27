@@ -234,14 +234,25 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --parent2 ' . $params{'parent2'} .
     ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
     ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
-    ' --index_file ' . $params{'index_file'} .
-    ' --index_barcodes ' . $params{'index_barcodes'} .
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
     ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-    " --parse_or_map parse-only || exit 100\n";
+    " --parse_or_map parse-only";
+if ($params{'index_file'} && $params{'index_barcodes'}) {
+    print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
+}
+print OUT " || exit 100\n";
+    
 close OUT;
 &Utils::system_call("chmod 755 msgRun1.sh");
 
+### Replace barcodes file if using Illumina indexing since we will now have num indexes * num barcodes 
+### barcoded individuals from parsing step
+if ($params{'index_file'} && $params{'index_barcodes'}) {
+    &Utils::system_call(
+        "python msg/barcode_splitter.py --make_indexed_msg_barcodes_file --msg_barcodes " . $params{'barcodes'} .
+        " --bcfile " . $params{'index_barcodes'});
+    $params{'barcodes'} = $params{'barcodes'} . '.after.index.parsing';
+}
 
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file
