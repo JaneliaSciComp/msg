@@ -115,25 +115,25 @@ close OUT;
 
 #Trim barcoded reads for quality if required, set reads.filtered paramater which all downstream calculations will look at.
 # (skip this step for illumina indexed reads.  We will do it after splitting the indexes.)
-open (OUT,'>msgRun0-0.sh');
+my $do_run_reads_trim = 0;
 if (($params{'quality_trim_reads_thresh'} > 0) && (!$params{'index_file'}) && (!$params{'index_barcodes'})) {
     $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
     if (-e $params{'reads.filtered'}) {
-        #just leave msgRun0-0.sh blank for consistancy
         print "Skipping quality trim step since $params{'reads.filtered'} already exists\n";
     }
     else {
+        open (OUT,'>msgRun0-0.sh');
         print OUT "python msg/TQSfastq.py" . " -f " . $params{'reads'} . " -t " . $params{'quality_trim_reads_thresh'} .
                 " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'};
+        close OUT;
+        &Utils::system_call("chmod 755 msgRun0-0.sh");
+        $do_run_reads_trim = 1;
     }
 }
 else {
-    #just leave msgRun0-0.sh blank for consistancy
     #make new name same as old name
     $params{'reads.filtered'} = $params{'reads'};
 }
-close OUT;
-&Utils::system_call("chmod 755 msgRun0-0.sh");    
 
 if (exists $params{'parent1_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
@@ -334,18 +334,22 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 
 ### Run jobs!
 
-#Trim barcoded reads for quality (If not requested the .sh file is simply blank)
-if ($params{'cluster'} != 0) {
-    &Utils::system_call("qsub -N msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-0.sh") ;
-}
-else {
-    &Utils::system_call("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+#Trim barcoded reads for quality
+my $hold_jid_for_trim_text = '';
+if ($do_run_reads_trim) {
+    if ($params{'cluster'} != 0) {
+        &Utils::system_call("qsub -N msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-0.sh") ;
+        $hold_jid_for_trim_text = "-hold_jid msgRun0-0.$$ ";
+    }
+    else {
+        &Utils::system_call("./msgRun0-0.sh > msgRun0-0.$$.out 2> msgRun0-0.$$.err");
+    }
 }
 
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      &Utils::system_call("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      &Utils::system_call("qsub -N msgRun0-1.$$ $hold_jid_for_trim_text $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-2.$$ $hold_jid_for_trim_text $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -355,7 +359,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent1_reads'} ) {
    if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-1.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
+      &Utils::system_call("qsub -N msgRun0-1.$$ $hold_jid_for_trim_text $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
       &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
@@ -364,7 +368,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
 
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-2.$$ -hold_jid msgRun0-0.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
+      &Utils::system_call("qsub -N msgRun0-2.$$ $hold_jid_for_trim_text $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
       &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
    } else {
       &Utils::system_call("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
@@ -372,7 +376,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    }
 }
 else { 
-   if ($params{'cluster'} != 0) { &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-0.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
+   if ($params{'cluster'} != 0) { &Utils::system_call("qsub -N msgRun1.$$ $hold_jid_for_trim_text -cwd -b y -V -sync n ./msgRun1.sh") ; }
    else { &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
 }
 
