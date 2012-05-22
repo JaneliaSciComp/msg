@@ -3,6 +3,11 @@
 ### Tina
 ### outputs fasta file for samtools
 
+use IO::Compress::Gzip qw(gzip $GzipError);
+
+use lib qw(./msg .);
+use Utils;
+
 use Getopt::Std;
 getopt("io");
 
@@ -13,11 +18,13 @@ END
 
 die $usage unless (-e $opt_i && $opt_o);
 
-my %reads = &readFasta($opt_i);
+my %reads = &Utils::readFasta($opt_i, 0);
 
-open OUT, ">$opt_o" || die "ERROR (reformatFasta4sam): Could not create $opt_o: $!\n";
+my $OUT = new IO::Compress::Gzip $opt_o 
+    or die "ERROR (reformatFasta4sam): Could not create $opt_o: IO::Compress::Gzip failed: $GzipError\n";
+
 foreach my $read (sort keys %reads) {
-	print OUT ">$read\n" . &p2q_print_str(\$reads{$read});
+	print $OUT ">$read\n" . &p2q_print_str(\$reads{$read});
 } close OUT;
 
 
@@ -37,23 +44,4 @@ sub p2q_print_str {
   }
 
   return $printout;
-}
-
-
-sub readFasta {
-	my ($file) = @_;
-	
-	my %reads;
-	my ($read,$seq);
-	open(FILE,$file) || die "ERROR (reformatFasta2sam): Can't open $file: $!\n";
-	while (<FILE>) { chomp $_;
-		if ($_ =~ /^>(\S+)/) {
-			$reads{$read} = $seq if ($seq);
-			$read = $1;
-			$seq = '';
-		} else { $seq .= $_; }
-	} close FILE;
-	$reads{$read} = $seq if ($read);
-
-	return %reads;  
 }

@@ -112,8 +112,8 @@ $genome_index{'parent2'} = $bwaindex2;
 
 
 sub run_stampy_on_cluster {
-    # Run stampy on SGE cluster.  Normally all cluster calls should be in msgCluster.pl but it wasn't
-    # practical in this case.
+    # Run stampy on SGE cluster.  Note, design-wise, normally all qsub/cluster calls should be in 
+    # msgCluster.pl but it wasn't practical in this case.
     
     my ($sp, $bwa_options, $out) = @_;
     
@@ -148,7 +148,7 @@ sub run_stampy_on_cluster {
         "-N msgRun0-$sp-stampy.$$", "-V", "-sync y", "-cwd", "-b y",
         "./msgRun0-$sp-stampy.sh");
     
-    #wait here until qsub is done
+    #we won't get here until qsub is done (-sync y above)
     #merge all of the temp files back together
     my @tmp_bam_file_names;
     for (1..$stampy_pseudo_threads) {push(@tmp_bam_file_names, "$out.tmp.$_.bam");}
@@ -176,12 +176,13 @@ if( $update_genomes ) {
 	$reads_for_updating_fq{'parent2'} = $parent2_reads if ($parent2_reads);
 	#%reads_for_updating_fq = (parent1 => $parent1_reads, parent2 => $parent2_reads) ;
 
+    #Make sure parents' reads files are specified and exist 
 	for $sp (keys %reads_for_updating_fq) {
 		$reads = $reads_for_updating_fq{$sp} ;
 		$reads or die "Must supply --$sp-reads" ;
 		-e $reads or die "No such file: $reads" ;
 		($reads_for_updating{$sp}, $d, $s) = fileparse $reads, qr/\.[^.]*$/ ;
-		$s eq ".fq" or $s eq ".fastq" or print "$sp reads extension is $s: expecting .fq or .fastq\n" ;
+		$s eq ".fq" or $s eq ".fastq" or $s eq ".gz" or print "$sp reads extension is $s: expecting .fq or .fastq\n" ;
 	}
 
 }
@@ -207,29 +208,29 @@ if( $update_genomes ) {
         #Trim reads if required (you could run this conncurrently while trimming barcoded reads for a speed up in the future.)
         if ($quality_trim_reads_thresh > 0) {            
             &Utils::system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
-                "-c",$quality_trim_reads_consec,"-q","-o",$reads_for_updating_fq{$sp});
-            $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq';
+                "-c",$quality_trim_reads_consec,"-q","-z","-o",$reads_for_updating_fq{$sp});
+            $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq.gz';
         }
     
-        &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
+        &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg.gz") ;
     
         $out = "update_reads-aligned-$sp" ;
         unless( -e "$out.pileup" ) {
             #Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
-            &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
+            &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg.gz") 
                 unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
+            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg.gz") ;
     
             unless (-e "$out.sam") {
                 if ($use_stampy == 1) {
                     #Build stampy genome file
-                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg") ;
+                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg.gz") ;
                     #Build stampy hash file
                     &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg") ;
                     #Call stampy mapping with or without bwa
                     my $bwa_options = "";
                     if ($stampy_premap_w_bwa == 1) {
-                        $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg\"";
+                        $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg.gz\""; #!! do I use.gz here and other bwa calls, is it the name of the index now??
                     }
                     if (($stampy_pseudo_threads > 0) && ($cluster == 1)) {
                         run_stampy_on_cluster($sp, $bwa_options, $out);
@@ -243,15 +244,16 @@ if( $update_genomes ) {
                     }                    
                 }
                 elsif ($bwa_alg eq 'aln') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
-                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg.gz", $reads_for_updating_fq{$sp}, "> $out.sai") ;
+                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg.gz", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
                 elsif ($bwa_alg eq 'bwasw') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg.gz", $reads_for_updating_fq{$sp}, "> $out.sam") ;
                 }
                 else {die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln or bwasw (or set use_stampy=1)";}
 
             }
+            
             # Filter out unmapped reads, etc
             &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
             if ($parent_mapq_filter > 0) {
@@ -267,7 +269,7 @@ if( $update_genomes ) {
                     &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
                 }
                 #Put back in MD tags, bwasw and stampy omit them:
-                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
+                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg.gz", "> $out.sorted.calmd.bam") ;
                 if ($DEBUG_MODE == $true) {
                     #copy instead of move for debug mode so we can view each step
                     &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
@@ -283,9 +285,9 @@ if( $update_genomes ) {
         }
 
         #Update the parent genome with the newly mapped reads
-		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
+		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg.gz", "$out.pileup", "0", $update_minQV, $min_coverage,
             $max_coverage_exceeded_state, $max_coverage_stds);
-		unlink("$genomes_fa{$sp}.msg");
+		unlink("$genomes_fa{$sp}.msg.gz");
 						
 		## Re-run BWA against updated refs
 		## Not doing that at the moment
@@ -307,12 +309,12 @@ for $sp (keys %genomes_fa) {
 	
 	if ($parse_or_map eq 'parse-only') {
 		### reformat for samtools (60 chars per line)
-		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa") unless (-e "${sp}_ref.fa") ;
+		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa.gz") unless (-e "${sp}_ref.fa.gz") ;
 	}
 }
 
 
-%genomes_fa = (parent1 => 'parent1_ref.fa', parent2 => 'parent2_ref.fa') ;
+%genomes_fa = (parent1 => 'parent1_ref.fa.gz', parent2 => 'parent2_ref.fa.gz') ;
 $parse_or_map = "--$parse_or_map" if ($parse_or_map);
 
 ### BWA INDEXING

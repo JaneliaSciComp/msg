@@ -99,8 +99,8 @@ print "\n" ;
 
 ### check if all the desired chroms are found in both parental files
 ### report their lengths also
-my %par1_reads = &readFasta($params{'parent1'});
-my %par2_reads = &readFasta($params{'parent2'});
+my %par1_reads = &Utils::readFasta($params{'parent1'}, 1);
+my %par2_reads = &Utils::readFasta($params{'parent2'}, 1);
 my @chroms ;
 if( $params{'chroms'} eq 'all') { 
 	@chroms = keys %par1_reads ; 
@@ -117,14 +117,14 @@ close OUT;
 # (skip this step for illumina indexed reads.  We will do it after splitting the indexes.)
 my $do_run_reads_trim = 0;
 if (($params{'quality_trim_reads_thresh'} > 0) && (!$params{'index_file'}) && (!$params{'index_barcodes'})) {
-    $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq';
+    $params{'reads.filtered'} = $params{'reads'} . '.trim.fastq.gz';
     if (-e $params{'reads.filtered'}) {
         print "Skipping quality trim step since $params{'reads.filtered'} already exists\n";
     }
     else {
         open (OUT,'>msgRun0-0.sh');
         print OUT "python msg/TQSfastq.py" . " -f " . $params{'reads'} . " -t " . $params{'quality_trim_reads_thresh'} .
-                " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'};
+                " -c " . $params{'quality_trim_reads_consec'} . " -q " . " -o " . $params{'reads'} . " -z";
         close OUT;
         &Utils::system_call("chmod 755 msgRun0-0.sh");
         $do_run_reads_trim = 1;
@@ -171,7 +171,7 @@ if (exists $params{'parent1_reads'}) {
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRun0-1.sh");
-    $params{'parent1'} .= '.msg.updated.fasta';
+    $params{'parent1'} .= '.msg.gz.updated.fasta';
 }
 
 
@@ -211,7 +211,7 @@ if (exists $params{'parent2_reads'}) {
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRun0-2.sh");
-    $params{'parent2'} .= '.msg.updated.fasta';
+    $params{'parent2'} .= '.msg.gz.updated.fasta';
 }
 
 
@@ -401,27 +401,3 @@ if ($params{'cluster'} != 0) {
 
 print "\nNOTE: Output and error messages are located in: msgOut.$$ and msgError.$$ \n\n";
 exit;
-
-
-####################################################################################################
-####################################################################################################
-
-sub readFasta {
-    my ($file) = @_;
-    
-    my %reads;
-    my ($read,$seq);
-    open(FILE,$file) || die "ERROR (msgCluster): Can't open $file: $!\n";
-    while (<FILE>) { chomp $_;
-        if ($_ =~ /^>(\S+)/) {
-            #If we don't have a previous read to save then something went wrong, check first
-            if ($seq && !$read) {die "Invalid FASTA file: @_";}
-            $reads{$read} = length($seq) if ($seq);
-            $read = $1;
-            $seq = '';
-        } else { $seq .= $_; }
-    } close FILE;
-    $reads{$read} = length($seq) if ($read);
-
-    return %reads;  
-}

@@ -8,6 +8,9 @@ use warnings;
 use Getopt::Std;
 use File::Basename;
 
+use lib qw(./msg .);
+use Utils;
+
 my $src = dirname $0 ;
 
 my ($refFile,$pileupFile,$add_indels,$minQV,$min_coverage,$max_coverage_exceeded_state,$max_coverage_stds) = @ARGV;
@@ -17,7 +20,7 @@ $min_coverage = 2 unless (defined $min_coverage);
 $max_coverage_exceeded_state = "N" unless (defined $max_coverage_exceeded_state);
 #default for max_coverage_stds is undef, which means there is no max.
 
-my %refReads = &readFasta($refFile);
+my %refReads = &Utils::readFasta($refFile,0);
 my $outfile  = "$refFile.updated";
 print "UPDATE REFERENCE FILE: $outfile\n";
 print "\tmin read coverage: $min_coverage\n" .
@@ -114,28 +117,6 @@ sub get_max_coverage {
     my $std = get_std_deviation(\@coverage_values, $mean);
     $max_coverage = $mean + ($max_coverage_stds * $std);
     return sprintf "%.0f", $max_coverage; #round to int
-}
-
-sub readFasta {
-	my ($file,$refReads) = @_;
-	my %reads;
-
-	my ($header,$seq,$keeper) = ('','',0);
-	open (FILE,$file) || die "ERROR Can't read $file: $!\n";
-	while (<FILE>) { chomp $_;
-		if ($_ =~ /^>(\S+)/) { 
-			$reads{$header} = $seq if ($seq);
-
-			$header = $1;
-			$seq = '';
-			$keeper = 1;
-
-		} elsif ($_ =~ />/) { $keeper = 0;
-		} elsif ($keeper==1) { $seq .= $_; }
-	} close FILE;
-	$reads{$header} = $seq if ($seq);
-
-	return %reads;
 }
 
 
