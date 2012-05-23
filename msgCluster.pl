@@ -171,7 +171,7 @@ if (exists $params{'parent1_reads'}) {
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRun0-1.sh");
-    $params{'parent1'} .= '.msg.gz.updated.fasta';
+    $params{'parent1'} .= '.msg.updated.fasta';
 }
 
 
@@ -211,7 +211,7 @@ if (exists $params{'parent2_reads'}) {
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRun0-2.sh");
-    $params{'parent2'} .= '.msg.gz.updated.fasta';
+    $params{'parent2'} .= '.msg.updated.fasta';
 }
 
 

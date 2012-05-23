@@ -378,7 +378,7 @@ class ParseAndMap(CommandLineApp):
             #convert to bam to prepare for sorting  
             subprocess.check_call(['samtools view -btSh -o %s.bam %s' % (file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
-            #samtools adds .bam suffix to output FYI
+            #Do the sort (samtools adds .bam suffix to output FYI)
             subprocess.check_call(['samtools sort -n %s.bam %s.sorted' % (file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
             #convert back to SAM
@@ -483,6 +483,7 @@ class ParseAndMap(CommandLineApp):
    
             #After updating files with options below, should we keep the intermediate version around:
             put_back_command = self.options.debug and 'cp' or 'mv' #means 'cp' if DEBUG else 'mv'
+            
             if self.options.mapq_filter:
                 # remove poor alignments if requested
                 for (sam_file, log_file) in ((aln_par1_sam,file_par1_log), (aln_par2_sam,file_par2_log)):

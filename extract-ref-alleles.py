@@ -13,6 +13,7 @@ from cmdline.cmdline import CommandLineApp
 from msglib import *
 import copy
 import shutil
+import gzip
 
 ##### INTERNAL OPTIONS (for developers) ######
 
@@ -139,7 +140,13 @@ class App(CommandLineApp):
         gc.disable()
 
         #Load in species reference genomes (one from each parent.)
-        ref_seqs = dict(par1=SeqIO.to_dict(SeqIO.parse(open(self.options.parent1),"fasta")), par2=SeqIO.to_dict(SeqIO.parse(open(self.options.parent2),"fasta")))
+        def open_file(path):
+            if os.path.splitext(path)[1] in ('.gz','.gzip'):
+                return gzip.open(path)
+            else:
+                return open(path)
+        ref_seqs = dict(par1=SeqIO.to_dict(SeqIO.parse(open_file(self.options.parent1),"fasta")), 
+            par2=SeqIO.to_dict(SeqIO.parse(open_file(self.options.parent2),"fasta")))
 
         #Manipulates files/paths to get at the barcoded reads for this individual
         #e.g., /home/pinerog/msg_work/MSG_big/SRR071201.fastq_sam_files/aln_indivA1_AAATAG_par1.sam

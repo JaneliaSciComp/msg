@@ -2,6 +2,7 @@
 use strict;
 use Getopt::Std;
 use File::Basename;
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError) ;
 use Switch;
 $" = "\n";
 my $msg_src = dirname $0 ;
@@ -242,8 +243,16 @@ my (@bad_barcode_quals,@good_barcode_quals,@mismatch_barcode_linkers,@unreadable
 
 my $i=0;
 my $k=0;
-open (IN,$infile);
-while (<IN>) { my $line = $_; chomp $line;
+my $file_handle;
+
+if ($infile =~ /\.gz$/ || $infile =~ /\.gzip$/) {        
+    $file_handle = new IO::Uncompress::Gunzip $infile
+        or die "gunzip failed: $GunzipError\n";    
+} else {
+    open $file_handle, "<", $infile || die "ERROR : Can't open $infile: $!\n";
+}
+
+while (<$file_handle>) { my $line = $_; chomp $line;
 	
 	####################################################################################################
 	### WRITE OUT...
@@ -275,7 +284,7 @@ while (<IN>) { my $line = $_; chomp $line;
 	my $name = $line;
 		
 	##### BARCODE, ID and SEQUENCE
-	$line = <IN>; chomp $line; my $orig_sequence = $line;
+	$line = <$file_handle>; chomp $line; my $orig_sequence = $line;
 	my $bc       = substr($orig_sequence,0,$BC_length);
 	my $identity = &matchBC($bc,%BC_table);
 	my $barcode_addon_check = 0; $barcode_addon_check = 1 if (substr($orig_sequence,$BC_length,length($barcode_addon)) ne ($barcode_addon));
@@ -295,7 +304,7 @@ while (<IN>) { my $line = $_; chomp $line;
 
 	my $full_sequence = substr($line,$seq_start);
 	my $unmasked_sequence = substr($line,$seq_start);
-	$line = <IN>; $line = <IN>; chomp $line;
+	$line = <$file_handle>; $line = <$file_handle>; chomp $line;
 	my $bc_qual = substr($line,0,$seq_start);
 	my $quality = substr($line,$seq_start);
 
