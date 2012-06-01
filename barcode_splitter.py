@@ -49,7 +49,7 @@ def main (argv=None):
     parser.add_option_group(output_group)
     
     barcode_location_group = optparse.OptionGroup(parser, "Barcode Location")
-    barcode_location_group.add_option ('--idxread', default=1, type='int', help='Indicate in which read to search for the barcode sequence (default: 1)')
+    barcode_location_group.add_option ('--idxread', default=1, type='int', help='Indicate in which read to search for the barcode sequence (1 based) (default: 1)')
     barcode_location_group.add_option ('--barcodes_at_end', action='store_true', default=False, help='Barcodes are at the end of the index read (default is at the beginning)')
     parser.add_option_group(barcode_location_group)
     
@@ -157,7 +157,10 @@ def read_barcodes(filename):
     '''Read barcodes file into dictionary'''
     barcode_dict = {}
     linenum = 0
-    filehandle = open(filename, 'rb')
+    if filename.lower().endswith('.gz'):
+        filehandle = gzip.open(filename, 'rb')
+    else:
+        filehandle = open(filename, 'rb')
     for line in filehandle:
         linenum += 1
         line = line.strip()

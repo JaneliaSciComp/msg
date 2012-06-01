@@ -166,7 +166,7 @@ class ParseAndMap(CommandLineApp):
         indexes file that contains a label for each index sequence.
         
         This method calls barcodes_splitter.py which will parse out each index into the working directory.
-        The strategy here is to grab the relevant files output from barcodes_splitter.py and call the
+        The strategy here is to grab the relevant split files output from barcodes_splitter.py and call the
         standard issue MSG parser on each of them
         and then move and rename those results to where/what MSG would expect.   Also note msgCluster.pl calls the 
         make_msg_barcodes_file function in barcode_splitter to create an updated barcodes file 
@@ -190,11 +190,16 @@ class ParseAndMap(CommandLineApp):
             os.mkdir(self.parsedir)
 
         #call barcode_splitter.py to break up by illumina indexes
-
         args = ['python', os.path.join(os.path.dirname(__file__), "barcode_splitter.py"), 
                   '--bcfile', str(self.options.index_barcodes),
                   '--prefix', prefix,
                   '--idxread 1', self.options.index_file, self.options.raw_data_file ]
+        if self.options.index_file.endswith('.gz'):
+            assert self.options.raw_data_file.endswith('.gz'), "Both of these files must be compressed or un-compressed: %s, %s" % (
+                self.options.index_file, self.options.raw_data_file)
+            #make sure output gets a .gz suffix
+            args.insert(7, '--suffix')
+            args.insert(8, '.gz')
         run_command(args)
         
         #Gather and process output files
@@ -202,6 +207,8 @@ class ParseAndMap(CommandLineApp):
         for index_id in set(barcodes_dict.values()):
             #Ignore all of the *_1 files because they came from illumina index fastq file 
             expected_file_name = "%s%s_read_2" % (prefix, index_id)
+            if self.options.index_file.endswith('.gz'):
+                expected_file_name += '.gz'
             print "processing file",expected_file_name
             assert os.path.exists(expected_file_name)
             

@@ -452,7 +452,7 @@ die "ERROR: how did this short read get past strict??? $name\n$sequence\n" if (l
 			}
 		}
 	}
-} close IN;
+} close $file_handle;
 
 &printout($dir,\%BC_arrays,\%BC_table,\@bad_codes,\@bad_codes_addon,\@overhang_mismatch,\@unreadable_codes,\@linkers,\@junk,\@RE_seq_mismatch);
 print "completed: ", $k+$i, "\n";
