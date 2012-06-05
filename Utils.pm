@@ -3,7 +3,7 @@
 package Utils;
 
 use POSIX;
-use IO::Uncompress::Gunzip qw(gunzip $GunzipError) ; #!! todo: update docs w this req.
+use IO::Uncompress::Gunzip qw(gunzip $GunzipError) ;
 
 sub strip {
     # Remove leading and trailing whitespace
