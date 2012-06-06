@@ -53,6 +53,7 @@ GetOptions(
     'parent_mapq_filter=i' => \$parent_mapq_filter,
     'index_file=s' => \$index_file,
     'index_barcodes=s' => \$index_barcodes,
+    'debug=i' => \$debug,
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -60,7 +61,6 @@ GetOptions(
 # Should MD tags be added to mapped SAM files when they are not included by default.
 # It's slower to add them but they seem to affect the output.
 $GEN_MD_TAGS = $true;
-$DEBUG_MODE = $false;
 
 ############################################
 
@@ -92,6 +92,7 @@ print "indiv_mapq_filter $indiv_mapq_filter\n\n";
 print "parent_mapq_filter $parent_mapq_filter\n\n";
 print "index_file $index_file\n\n";
 print "index_barcodes $index_barcodes\n\n";
+print "debug $debug\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -110,6 +111,23 @@ $genomes_fa{'parent2'} = $parent2_genome if $parent2_genome;
 $genome_index{'parent1'} = $bwaindex1;
 $genome_index{'parent2'} = $bwaindex2;
 
+
+sub post_update_cleanup {
+    # When in debug mode remove any files that aren't needed downstream and aren't needed for a re-run
+    my ($sp, $parent_reads_for_updating_fq, $out_prefix) = @_;
+    #examples from toy run:
+    # $sp = parent2
+    # $parent_reads_for_updating_fq = parent2_reads.fq.trim.fastq.gz
+    # $out_prefix = update_reads-aligned-parent2
+    if (!$debug) {
+        if ($parent_reads_for_updating_fq =~ /trim\.fastq\.gz$/) {
+            unlink($parent_reads_for_updating_fq);
+        }
+        unlink("$genomes_fa{$sp}.msg.updated.fastq");
+        unlink("$genomes_fa{$sp}.msg");
+        unlink glob("$out_prefix.*");
+    }
+}
 
 sub run_stampy_on_cluster {
     # Run stampy on SGE cluster.  Note, design-wise, normally all qsub/cluster calls should be in 
@@ -157,7 +175,7 @@ sub run_stampy_on_cluster {
     &Utils::system_call("samtools view -h -o $out.sam $out.stampy.tmp.bam");
     
     #delete temp files and qsub rubbish
-    if (!$DEBUG_MODE) {
+    if (!$debug) {
         unlink("$out.stampy.tmp.bam");
         &Utils::system_call("rm -f $out.tmp.*");
     }
@@ -206,7 +224,7 @@ if( $update_genomes ) {
         }
         
         #Trim reads if required (you could run this conncurrently while trimming barcoded reads for a speed up in the future.)
-        if ($quality_trim_reads_thresh > 0) {            
+        if ($quality_trim_reads_thresh > 0) {
             &Utils::system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
                 "-c",$quality_trim_reads_consec,"-q","-z","-o",$reads_for_updating_fq{$sp});
             $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq.gz';
@@ -265,12 +283,12 @@ if( $update_genomes ) {
             &Utils::system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
             
             if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
-                if ($DEBUG_MODE == $true) {
+                if ($debug == $true) {
                     &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
                 }
                 #Put back in MD tags, bwasw and stampy omit them:
                 &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
-                if ($DEBUG_MODE == $true) {
+                if ($debug == $true) {
                     #copy instead of move for debug mode so we can view each step
                     &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
                 }
@@ -287,10 +305,10 @@ if( $update_genomes ) {
         #Update the parent genome with the newly mapped reads
 		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
             $max_coverage_exceeded_state, $max_coverage_stds);
-		#!!unlink("$genomes_fa{$sp}.msg");
 						
 		## Re-run BWA against updated refs
 		## Not doing that at the moment
+		&post_update_cleanup($sp, $reads_for_updating_fq{$sp}, $out);
 	}
 	print "Finished updating genomes\n" ;
 	exit;

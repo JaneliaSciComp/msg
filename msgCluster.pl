@@ -54,6 +54,7 @@ my %params = (
         parent2_mapq_filter => '0',
         index_file => '',
         index_barcodes => '',
+        debug => '0',
     );
 
 open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
@@ -159,7 +160,8 @@ if (exists $params{'parent1_reads'}) {
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
     ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
     ' --parent_stampy_substitution_rate ' . $params{'parent1_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent1_mapq_filter'}
+    ' --parent_mapq_filter ' . $params{'parent1_mapq_filter'} .
+    ' --debug ' . $params{'debug'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -199,7 +201,8 @@ if (exists $params{'parent2_reads'}) {
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
     ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
     ' --parent_stampy_substitution_rate ' . $params{'parent2_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent2_mapq_filter'}
+    ' --parent_mapq_filter ' . $params{'parent2_mapq_filter'} .
+    ' --debug ' . $params{'debug'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -388,7 +391,7 @@ if ($params{'cluster'} != 0) {
    #Run a simple validation
    &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
    #Cleanup - move output files to folders, remove barcode related files
-   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
 } else { 
    &Utils::system_call("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
@@ -396,7 +399,7 @@ if ($params{'cluster'} != 0) {
    #Run a simple validation
    &Utils::system_call("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
    #Cleanup - move output files to folders, remove barcode related files
-   &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
+   &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
 }
 
 print "\nNOTE: Output and error messages are located in: msgOut.$$ and msgError.$$ \n\n";
