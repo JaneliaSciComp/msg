@@ -17,6 +17,8 @@ indicated in parentheses):
 - pysam-0.1.2 (apply fix*)
 - R packages (HiddenMarkov 1.3-1, zoo 1.6-2, R.methodsS3 1.2.0 and R.oo 1.7.3)
 - Perl Modules (IO::Uncompress::Gunzip)
+    -- A command like this should work on Unix Desktop Systems:
+    -- perl -MCPAN -e 'install IO::Uncompress::Gunzip'
 *http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0
 
 Setting up the MSG analysis directory
