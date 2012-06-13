@@ -177,8 +177,9 @@ sub run_stampy_on_cluster {
     #delete temp files and qsub rubbish
     if (!$debug) {
         unlink("$out.stampy.tmp.bam");
-        &Utils::system_call("rm -f $out.tmp.*");
     }
+    &Utils::system_call("rm -f $out.tmp.*");
+
     unless(-e 'stampy_logs' or mkdir 'stampy_logs') {
         die "Unable to create stampy_logs\n";
     }
