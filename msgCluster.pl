@@ -3,12 +3,21 @@
 ### Tina
 ### run msg on cetus
 use strict;
+use Cwd;
 use lib qw(./msg .);
 use Utils;
 
 print "\nMSG\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
 printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$sec;
+
+### Make sure all required dependencies are installed
+
+my $last_path = getcwd();
+chdir('msg') or die "$!";
+&Utils::system_call("chmod 755 test_dependencies.sh");
+&Utils::system_call("test_dependencies.sh");
+chdir($last_path) or die "$!";
 
 ### Default parameters
 die "ERROR: Can't locate msg.cfg.\n" unless (-e 'msg.cfg');
