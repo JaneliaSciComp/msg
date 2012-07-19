@@ -17,7 +17,7 @@ use strict;
 # to simulate PE reads use simulate_PEshortreads.pl
 
 # no error model is currently implemented, all bases are given maximum QV (=I)
-# RUI varition in read length is implemented: 75-$maxreadlength 
+# RUI varition in read length is implemented: $minreadlength-$maxreadlength 
 
 # NOTE - the genome reference file should stochiometrically represent a recombinant diploid or haploid individual
 # example: F2 individual, there should be two recombinant genomes
@@ -32,6 +32,12 @@ my $mut_rate = 0.03;							# rate of divergence per base pair (0.03 for Dsim-Dse
 my $indel_mu_scalar = 0.157;					# scalar to multiply indel divergence by (~0.157 for Drosophila)
 my $indel_size = 1.2;							# mean of exponential that describes indel size distribution (~1.2 for Drosophila)
 #################  SET MUTATION PARAMETERS HERE ################################################################################
+
+#################  OTHER USER SETTINGS  ########################################################################################
+my $minreadlength = 75; #Leave at 75 unless doing max read length < 75
+
+################################################################################################################################
+
 
 
 use Math::Random qw(:all);
@@ -114,7 +120,7 @@ while ($counter < $numreads){
 	    # print "site: $site pos: ", $pos-$maxreadlength+3, "\n";
 	
 		my $polarity = random_uniform(1);												# direction of read and whether it is mated
-		my $readlength = random_uniform_integer(1, 75, $maxreadlength);					# read length
+		my $readlength = random_uniform_integer(1, $minreadlength, $maxreadlength);					# read length
 		$pos_right = $MseIsites[$site+1]; 
 		$pos_left  = $MseIsites[$site-1];
 		$diff_right = $pos_right + (-1*$pos);
@@ -126,7 +132,7 @@ while ($counter < $numreads){
 			# print "read $i polarity (+) position: ", $pos-$maxreadlength+3, "\n";
 			# print "forward read: ", $pos-$maxreadlength+3, " - ", $pos+$readlength-$maxreadlength+3, "\n";
 			$read_polarity = 0;
-			$read_start= $pos+6-100;
+			$read_start= $pos-($maxreadlength-2);
 			$read = substr($genome, $pos+1, $readlength);
 			$counter++;
 			} # forward polarity
@@ -134,7 +140,7 @@ while ($counter < $numreads){
 			# print "read $i polarity (-) position: ", $pos-$maxreadlength+3, "\n";
 			# print "forward read: ", $pos-$readlength-$maxreadlength+3, " - ", $pos-$maxreadlength+3, "\n";
 			$read_polarity = 16;
-			$read_start= $pos-$readlength+9-101;
+			$read_start= $pos-($maxreadlength-4)-$readlength;
 			$read = rev_comp(substr($genome, $pos-$readlength+3, $readlength));
 			$counter++;
 			} # reverse polarity
