@@ -113,7 +113,7 @@ $genome_index{'parent2'} = $bwaindex2;
 
 
 sub post_update_cleanup {
-    # When in debug mode remove any files that aren't needed downstream and aren't needed for a re-run
+    # When not in debug mode remove any files that aren't needed downstream and aren't needed for a re-run
     my ($sp, $parent_reads_for_updating_fq, $out_prefix) = @_;
     #examples from toy run:
     # $sp = parent2
