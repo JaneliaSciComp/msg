@@ -369,7 +369,7 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
         '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
         '--indiv_mapq_filter', $indiv_mapq_filter, '--index_file', $index_file,
         '--index_barcodes', $index_barcodes, '--quality_trim_reads_thresh', $quality_trim_reads_thresh || '0',
-        '--quality_trim_reads_consec', $quality_trim_reads_consec || '0'
+        '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug
         ) ;
 
 ## Strip species out of reference column

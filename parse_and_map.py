@@ -135,14 +135,14 @@ class ParseAndMap(CommandLineApp):
         self.parsed_time = time.time()
         if self.options.map_only:
             print bcolors.WARN + 'Refusing to parse raw reads: --map-only option is in effect' + bcolors.ENDC
-
         elif os.path.exists(self.parsedir):
             print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC
         else:
             if self.options.index_file and self.options.index_barcodes:
-                self.parse_illumina_indexes()
+                final_paths = self.parse_illumina_indexes()
             else:
-                self.parse()
+                final_paths = self.parse()
+            self.qual_trim_parsed_files(final_paths)
 
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
@@ -154,6 +154,24 @@ class ParseAndMap(CommandLineApp):
                 #bwasw and stampy don't make sai files    
                 self.delete_files()
 
+    def qual_trim_parsed_files(self, final_paths):
+        """Optionally quality trim the files.
+        Go through all parsed files and quality trim them.
+        The process should be the same for both illumina indexes, and normal parsing.
+        Maintain existing names"""
+        if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
+            for path in final_paths:
+                args = [os.path.join(os.path.dirname(__file__), "TQSfastq.py"), 
+                          '-f', path, '-t', str(self.options.quality_trim_reads_thresh),
+                          '-c', str(self.options.quality_trim_reads_consec), '-q', '-o', path]
+                print ' '.join(args)
+                subprocess.check_call(' '.join(args), shell=True)
+                new_expected_file_name = path + '.trim.fastq'
+                if self.options.debug:
+                    shutil.copy(path, path + '.pretrim.fastq')
+                os.remove(path)
+                shutil.move(new_expected_file_name, path)
+            
     def create_symlink(self, file_path, shortcut_path):
         sym_link_args = 'ln -s %s %s.fq' % (file_path, shortcut_path)
         print "create ln with .fq extension:", sym_link_args
@@ -174,6 +192,9 @@ class ParseAndMap(CommandLineApp):
         """
         print "Starting illumina index parse"
         prefix = 'index_parse' #used to keep track of index parsing output files
+
+        #store and return the final relative paths of all the parsed individuals' fastq files
+        final_paths = []
 
         #capture output here
         log = open(os.path.join(self.logdir, '%s.log' % (prefix)), "w")
@@ -212,16 +233,6 @@ class ParseAndMap(CommandLineApp):
             print "processing file",expected_file_name
             assert os.path.exists(expected_file_name)
             
-            #Optionally quality trim the files
-            if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
-                args = [os.path.join(os.path.dirname(__file__), "TQSfastq.py"), 
-                          '-f', expected_file_name, '-t', str(self.options.quality_trim_reads_thresh),
-                          '-c', str(self.options.quality_trim_reads_consec), '-q', '-o', expected_file_name]
-                run_command(args)
-                if not self.options.debug:
-                    os.remove(expected_file_name)
-                expected_file_name += '.trim.fastq'
-            
             #Process file through regular MSG parser
             self.parse(expected_file_name)
             expected_msg_parse_dir = expected_file_name + '_parsed' #this is where it will put the parsed files
@@ -242,13 +253,15 @@ class ParseAndMap(CommandLineApp):
             for fn in os.listdir(expected_msg_parse_dir):
                 #Skip .fq files since we assume they are symlinks. (this gets hairy).  
                 #Explanation: The MSG parser created symbolic links to each file appending an .fq so
-                #stampy can process them.  Since we're renaming the files we need to not copy the symlinks and later recreate them
+                #stampy can process them.  Since we're renaming the files we need to not copy the 
+                #symlinks and later recreate them
                 if not fn.endswith('.fq'):
                     #example rename indivA12_AATAAG -> indivA12standard_AATAAG
                     new_name = make_new_name(fn, index_id)
                     shutil.copy(os.path.join(expected_msg_parse_dir, fn), os.path.join(self.parsedir, new_name))
-                    #Recreate symlink we didn't copy
+                    #Recreate symlink we didn't copy and store final path
                     if fn.startswith('indiv'):
+                        final_paths.append(os.path.join(self.parsedir, new_name))
                         #ln trivia: symlink target should be relative to sym link, not where you are.
                         shortcut = os.path.join(self.parsedir, new_name)
                         self.create_symlink(new_name, shortcut)
@@ -261,8 +274,15 @@ class ParseAndMap(CommandLineApp):
         if not self.options.debug:
             #delete the barcode_splitter output reads files
             subprocess.check_call("rm %s*_read_*" % prefix, shell=True)
+            
+        log.close()
+        
+        return final_paths
 
     def parse(self, use_raw_data_file=None):
+        
+        #store and return the final relative paths of all the parsed individuals' fastq files
+        final_paths = []
 
         # Convert Illumina reads to format for BWA - Peters program does not create a new file,
         # instead it writes to existing files. So first need to remove the older files.
@@ -318,6 +338,7 @@ class ParseAndMap(CommandLineApp):
         for ind in self.bc:
             file_name = 'indiv' + ind[1] + '_' + ind[0]
             fastq_file = raw_data + '_parsed/' + file_name
+            final_paths.append(fastq_file)
             number_reads = count_lines(fastq_file)/4
             total_reads += number_reads
             stats_file.write('indiv%s_%s\t%s\n' %(ind[1],ind[0],number_reads))
@@ -332,6 +353,7 @@ class ParseAndMap(CommandLineApp):
         self.parsed_time = time.time()
         parsing_time = (self.parsed_time - self.start_time)
         print "Parsing took about %s minutes" %(parsing_time/60)
+        return final_paths
     
     def _map_w_stampy(self, fastq_file, parent1, parent2, aln_par1_sam, aln_par2_sam, file_par1_log,
         file_par2_log, misc_indiv_log):
@@ -396,7 +418,7 @@ class ParseAndMap(CommandLineApp):
             os.remove('%s.sorted.bam' % file_to_fix)
             
     def map(self):
-
+        
         #Run bwa programs on each indiv file
         #Output to new folder
     
