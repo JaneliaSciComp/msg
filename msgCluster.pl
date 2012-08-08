@@ -1,9 +1,5 @@
 #!/usr/bin/perl -w
-### 04.27.10
-### Tina
-### run msg on cetus
 use strict;
-use Cwd;
 use lib qw(./msg .);
 use Utils;
 
@@ -12,16 +8,11 @@ my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
 printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$sec;
 
 ### Make sure all required dependencies are installed
-
-my $last_path = getcwd();
-chdir('msg') or die "$!";
-&Utils::system_call("chmod 755 test_dependencies.sh");
-&Utils::system_call("test_dependencies.sh");
-chdir($last_path) or die "$!";
+&Utils::test_dependencies();
 
 ### Default parameters
-die "ERROR: Can't locate msg.cfg.\n" unless (-e 'msg.cfg');
-my %params = (
+### All of these parameters are required
+my %default_params = (
         barcodes       => 'NULL',
         re_cutter      => 'MseI',
         linker_system  => 'Dros_SR_vII',
@@ -44,8 +35,6 @@ my %params = (
         cluster        => '1',
         threads        => '8',
         theta        => '1',
-        min_coverage => '2',
-        max_coverage_exceeded_state => 'N',
         addl_qsub_option_for_exclusive_node => '',
         addl_qsub_option_for_pe => '',
         bwa_alg => 'aln',
@@ -56,56 +45,14 @@ my %params = (
         quality_trim_reads_thresh => '0',
         quality_trim_reads_consec => '30',
         indiv_stampy_substitution_rate => '0.001',
-        parent1_stampy_substitution_rate => '0.001',
-        parent2_stampy_substitution_rate => '0.001',
         indiv_mapq_filter => '0',
-        parent1_mapq_filter => '0',
-        parent2_mapq_filter => '0',
         index_file => '',
         index_barcodes => '',
         debug => '0',
     );
 
-open (IN,'msg.cfg') || die "ERROR: Can't open msg.cfg: $!\n";
-while (<IN>) { chomp $_;
-	next if ($_ =~ /^\#/);
-	next unless ($_);
-	my ($key,$val) = split(/=/,$_,2);
-	$params{Utils::strip($key)} = Utils::strip($val);
-} close IN;
-
-### Configure some parameters ###
-$params{'chroms2plot'} = $params{'chroms'} unless (defined $params{'chroms2plot'});
-my $update_nthreads = $params{'threads'} if (defined $params{'threads'}); ## Number of qsub slots when running pe option
-#add space after qsub options so we can insert into commands, add thread/slot count to -pe option
-if (defined $params{'addl_qsub_option_for_exclusive_node'} && $params{'addl_qsub_option_for_exclusive_node'}) {
-    #example: go from user msg.cfg entered "-l excl=true" to "-l excl=true "
-    $params{'addl_qsub_option_for_exclusive_node'} = $params{'addl_qsub_option_for_exclusive_node'}.' ';
-}
-else {
-    $params{'addl_qsub_option_for_exclusive_node'} = '';
-}
-if (defined $params{'addl_qsub_option_for_pe'} && $params{'addl_qsub_option_for_pe'}) {
-    #example: go from user msg.cfg entered "-pe batch" to "-pe batch 8 "
-    $params{'addl_qsub_option_for_pe'} = $params{'addl_qsub_option_for_pe'}." $update_nthreads ";
-}
-else {
-    $params{'addl_qsub_option_for_pe'} = '';
-}
-
-### check if all files exist
-foreach my $param (qw( barcodes reads parent1 parent2 parent1_reads parent2_reads )) {
-	if (exists $params{$param}) {
-		die "Exiting from msgCluster: Missing file $params{$param}.\n" unless (-e $params{$param});
-	}
-}
-
-### double check if the minimum exist
-foreach my $key (sort keys %params) {
-    die "ERROR (msgCluster): undefined parameter ($key) in msg.cfg.\n" unless ($params{$key} ne 'NULL');
-    print "$key:\t$params{$key}\n" ;
-}
-print "\n" ;
+my %params = Utils::parse_config('msg.cfg', %default_params);
+Utils::validate_config(%params, qw( barcodes reads parent1 parent2 parent1_reads parent2_reads ));
 
 ### check if all the desired chroms are found in both parental files
 ### report their lengths also
@@ -122,89 +69,6 @@ open (OUT,'>msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLen
 print OUT "chr,length\n";
 foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; } 
 close OUT;
-
-
-if (exists $params{'parent1_reads'}) {
-    $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
-    open (OUT,'>msgRun0-1.sh');
-    print OUT "/bin/hostname\n/bin/date\n" .
-	'perl msg/msg.pl ' .
-	' --update ' .
-	' --barcodes ' . $params{'barcodes'} .
-	' --reads ' . $params{'reads'} . 
-	' --parent1 ' . $params{'parent1'} . 
-	' --update_minQV ' . $params{'update_minQV'} .
-	' --min_coverage ' . $params{'min_coverage'} .
-	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .    
-	' --parent1-reads ' . $params{'parent1_reads'} .
-	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'} .
-	' --bwa_alg ' . $params{'bwa_alg'} .
-	' --bwa_threads ' . $params{'bwa_threads'} .
-    ' --use_stampy ' . $params{'use_stampy'} .
-    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
-    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
-    ' --cluster ' . $params{'cluster'} .
-    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-    ' --parent_stampy_substitution_rate ' . $params{'parent1_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent1_mapq_filter'} .
-    ' --debug ' . $params{'debug'}
-    ;
-    #Add on optional arguments
-    if (defined $params{'max_coverage_stds'}) {
-        print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
-    }
-    if ($params{'addl_qsub_option_for_pe'}) {
-        print OUT ' --addl_qsub_option_for_pe pe';
-    }
-	print OUT " || exit 100\n";
-    close OUT;
-    &Utils::system_call("chmod 755 msgRun0-1.sh");
-    $params{'parent1'} .= '.msg.updated.fasta';
-}
-
-
-if (exists $params{'parent2_reads'}) {
-    $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
-    open (OUT,'>msgRun0-2.sh');
-    print OUT "/bin/hostname\n/bin/date\n" .
-	'perl msg/msg.pl ' .
-	' --update ' .
-	' --barcodes ' . $params{'barcodes'} .
-	' --reads ' . $params{'reads'} . 
-	' --parent2 ' . $params{'parent2'} . 
-	' --update_minQV ' . $params{'update_minQV'} .
-	' --min_coverage ' . $params{'min_coverage'} .
-	' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .  
-	' --parent2-reads ' . $params{'parent2_reads'} .
-	' --bwaindex1 ' . $params{'bwaindex1'} .
-	' --bwaindex2 ' . $params{'bwaindex2'} .
-	' --bwa_alg ' . $params{'bwa_alg'} .
-	' --bwa_threads ' . $params{'bwa_threads'} .
-    ' --use_stampy ' . $params{'use_stampy'} .
-    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
-    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
-    ' --cluster ' . $params{'cluster'} .
-    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-    ' --parent_stampy_substitution_rate ' . $params{'parent2_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent2_mapq_filter'} .
-    ' --debug ' . $params{'debug'}
-    ;
-    #Add on optional arguments
-    if (defined $params{'max_coverage_stds'}) {
-        print OUT ' --max_coverage_stds ' . $params{'max_coverage_stds'};
-    }
-    if ($params{'addl_qsub_option_for_pe'}) {
-        print OUT ' --addl_qsub_option_for_pe pe';
-    }    
-	print OUT " || exit 100\n";
-    close OUT;
-    &Utils::system_call("chmod 755 msgRun0-2.sh");
-    $params{'parent2'} .= '.msg.updated.fasta';
-}
-
 
 ####################################################################################################
 ### Parsing
@@ -325,38 +189,11 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 
 ### Run jobs!
 
-if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
-   if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      &Utils::system_call("qsub -N msgRun0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
-      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$,msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
-   } else {
-      &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
-      &Utils::system_call("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
-      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
-   }
-
-} elsif ( exists $params{'parent1_reads'} ) {
-   if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-1.sh") ;
-      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
-   } else {
-      &Utils::system_call("./msgRun0-1.sh > msgRun0-1.$$.out 2> msgRun0-1.$$.err") ;
-      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
-   }
-
-} elsif ( exists $params{'parent2_reads'} ) {
-   if ($params{'cluster'} != 0) {
-      &Utils::system_call("qsub -N msgRun0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun0-2.sh") ;
-      &Utils::system_call("qsub -N msgRun1.$$ -hold_jid msgRun0-2.$$ -cwd -b y -V -sync n ./msgRun1.sh") ;
-   } else {
-      &Utils::system_call("./msgRun0-2.sh > msgRun0-2.$$.out 2> msgRun0-2.$$.err") ;
-      &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ;
-   }
+if ($params{'cluster'} != 0) {
+    &Utils::system_call("qsub -N msgRun1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; 
 }
-else { 
-   if ($params{'cluster'} != 0) { &Utils::system_call("qsub -N msgRun1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; }
-   else { &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; }
+else {
+    &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; 
 }
 
 if ($params{'cluster'} != 0) {

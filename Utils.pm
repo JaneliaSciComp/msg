@@ -26,6 +26,73 @@ sub system_call {
     print 'ended '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
 }
 
+sub test_dependencies {
+    # Make sure all required dependencies are installed
+    my $last_path = getcwd();
+    chdir('msg') or die "$!";
+    system_call("chmod 755 test_dependencies.sh");
+    system_call("test_dependencies.sh");
+    chdir($last_path) or die "$!";
+}
+
+sub parse_config {
+    #Read in msg.cfg or other specified file and update where needed
+    
+    my ($cfg_path, %default_params) = @_;
+
+    die "ERROR: Can't locate $cfg_path.\n" unless (-e $cfg_path);
+    open (IN, $cfg_path) || die "ERROR: Can't open $cfg_path: $!\n";
+    while (<IN>) { chomp $_;
+        next if ($_ =~ /^\#/);
+        next unless ($_);
+        my ($key,$val) = split(/=/,$_,2);
+        $default_params{strip($key)} = strip($val);
+    } close IN;
+    
+    ### Configure some parameters ###
+    if (defined $default_params{'chroms'}) {
+        $default_params{'chroms2plot'} = $default_params{'chroms'} unless (defined $default_params{'chroms2plot'});
+    }
+    my $update_nthreads = $default_params{'threads'} if (defined $default_params{'threads'}); ## Number of qsub slots when running pe option
+    #add space after qsub options so we can insert into commands, add thread/slot count to -pe option
+    if (defined $default_params{'addl_qsub_option_for_exclusive_node'} && $default_params{'addl_qsub_option_for_exclusive_node'}) {
+        #example: go from user msg.cfg entered "-l excl=true" to "-l excl=true "
+        $default_params{'addl_qsub_option_for_exclusive_node'} = $default_params{'addl_qsub_option_for_exclusive_node'}.' ';
+    }
+    else {
+        $default_params{'addl_qsub_option_for_exclusive_node'} = '';
+    }
+    if (defined $default_params{'addl_qsub_option_for_pe'} && $default_params{'addl_qsub_option_for_pe'}) {
+        #example: go from user msg.cfg entered "-pe batch" to "-pe batch 8 "
+        $default_params{'addl_qsub_option_for_pe'} = $default_params{'addl_qsub_option_for_pe'}." $update_nthreads ";
+    }
+    else {
+        $default_params{'addl_qsub_option_for_pe'} = '';
+    }
+    return %default_params;
+}
+
+sub validate_config {
+    #Check that params were entered correctly and nothing essential is missing
+
+    my (%params, @required_file_paths) = @_;
+
+    ### check if all files exist
+    foreach my $param (@required_file_paths) {
+        if (exists $params{$param}) {
+            die "Exiting from msgCluster: Missing file $params{$param}.\n" unless (-e $params{$param});
+        }
+    }
+    
+    print "\nParameters:\n\n";
+    ### double check if the minimum exist
+    foreach my $key (sort keys %params) {
+        die "ERROR (msgCluster): undefined parameter ($key) in config file.\n" unless ($params{$key} ne 'NULL');
+        print "$key:\t$params{$key}\n" ;
+    }
+    print "\n" ;
+}
+
 sub readFasta {
     #Return a dictionary: length or sequence of each read by reference id.  Supports gzipped 
     #fasta files or regular.
