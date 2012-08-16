@@ -319,7 +319,7 @@ if( $update_genomes ) {
 
 ## -------------------------------------------------------------------------------
 ##
-## Use BWA to align raw reads against genomes, creating two sam files for each individual
+## Use BWA to align raw reads against genomes, creating two sam files for each parent ref
 for $sp (keys %genomes_fa) {
 	-e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}" ;
 
