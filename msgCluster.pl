@@ -51,8 +51,9 @@ my %default_params = (
         debug => '0',
     );
 
-my %params = Utils::parse_config('msg.cfg', %default_params);
-Utils::validate_config(%params, qw( barcodes reads parent1 parent2 parent1_reads parent2_reads ));
+my $params = Utils::parse_config('msg.cfg', \%default_params);
+Utils::validate_config($params, qw( barcodes reads parent1 parent2 ));
+my %params = %$params;
 
 ### check if all the desired chroms are found in both parental files
 ### report their lengths also
