@@ -19,6 +19,7 @@ import sys, os
 import shutil
 import glob
 import time, datetime
+import gzip
 from mapping_functions import *
 from msglib import *
 from cmdline.cmdline import CommandLineApp
@@ -30,6 +31,7 @@ import barcode_splitter
 # It seems to be very slow to add these in, but it does affect the end result.  I'm not sure 
 # where though.
 GEN_MD = True
+GZIP_OUTPUT = True
 
 #############################
 
@@ -161,22 +163,23 @@ class ParseAndMap(CommandLineApp):
         Maintain existing names"""
         if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
             for path in final_paths:
+                if GZIP_OUTPUT:
+                    gzip_switch = '-z'
+                    new_expected_file_name = path + '.trim.fastq.gz'
+                else:
+                    gzip_switch = ''
+                    new_expected_file_name = path + '.trim.fastq'
                 args = [os.path.join(os.path.dirname(__file__), "TQSfastq.py"), 
                           '-f', path, '-t', str(self.options.quality_trim_reads_thresh),
-                          '-c', str(self.options.quality_trim_reads_consec), '-q', '-o', path]
+                          '-c', str(self.options.quality_trim_reads_consec), '-q', gzip_switch,
+                          '-o', path]
                 print ' '.join(args)
                 subprocess.check_call(' '.join(args), shell=True)
-                new_expected_file_name = path + '.trim.fastq'
                 if self.options.debug:
-                    shutil.copy(path, path + '.pretrim.fastq')
+                    shutil.copy(path, path + '.pretrim')
                 os.remove(path)
                 shutil.move(new_expected_file_name, path)
             
-    def create_symlink(self, file_path, shortcut_path):
-        sym_link_args = 'ln -s %s %s.fq' % (file_path, shortcut_path)
-        print "create ln with .fq extension:", sym_link_args
-        subprocess.check_call([sym_link_args], shell=True)
-
     def parse_illumina_indexes(self):
         """
         When the illumina index system is used.  We have 3 input files: A normal fastq file with all of the reads,
@@ -307,10 +310,8 @@ class ParseAndMap(CommandLineApp):
         sys.stdout.flush()
         subprocess.call(args) 
 
-
         # Outputs separate file for each individual with barcode and identifier in filename
         # "indiv#_barcode"
-    
     
         #print file with statistics of parsing
         stats_file = open(raw_data+'_stats.txt','w')
@@ -338,15 +339,25 @@ class ParseAndMap(CommandLineApp):
         for ind in self.bc:
             file_name = 'indiv' + ind[1] + '_' + ind[0]
             fastq_file = raw_data + '_parsed/' + file_name
-            final_paths.append(fastq_file)
             number_reads = count_lines(fastq_file)/4
             total_reads += number_reads
             stats_file.write('indiv%s_%s\t%s\n' %(ind[1],ind[0],number_reads))
-            #TEMP - make sym links to parsed fq files with .fq extensions to they can run in stampy
-            #Later versions of stampy will hopefully fix this so we can remove it.
-            #ln trivia: symlink target should be relative to sym link, not where you are.
-            self.create_symlink(file_name, fastq_file)
-                
+            #gzip output
+            if GZIP_OUTPUT:
+                f_in = open(fastq_file, 'rb')
+                f_out = gzip.open('%s.gz' % fastq_file, 'wb')
+                f_out.writelines(f_in)
+                f_out.close()
+                f_in.close()
+                os.remove(fastq_file)
+                fastq_file += '.gz'
+            else:
+                #TEMP - make sym links to parsed fq files with .fq extensions to they can run in stampy
+                #Later versions of stampy will hopefully fix this so we can remove it.
+                #ln trivia: symlink target should be relative to sym link, not where you are.
+                self.create_symlink(file_name, fastq_file)
+            final_paths.append(fastq_file)
+        
         stats_file.write('total_reads\t%s' %(total_reads))
         stats_file.close()
     
@@ -355,12 +366,20 @@ class ParseAndMap(CommandLineApp):
         print "Parsing took about %s minutes" %(parsing_time/60)
         return final_paths
     
+    def create_symlink(self, file_path, shortcut_path):
+        sym_link_args = 'ln -s %s %s.fq' % (file_path, shortcut_path)
+        print "create ln with .fq extension:", sym_link_args
+        subprocess.check_call([sym_link_args], shell=True)
+    
     def _map_w_stampy(self, fastq_file, parent1, parent2, aln_par1_sam, aln_par2_sam, file_par1_log,
         file_par2_log, misc_indiv_log):
-        #Align each to sim - output fastq file
+
         #TEMP: stampy requires .fq extension on our files.  Remove this if stampy fixes it.
-        # I'm temporarily creating symlinks in the parse step.
-        fastq_file += '.fq'
+        # I'm temporarily creating symlinks in the parse step. (doesn't apply to gz files)
+        if not fastq_file.lower().endswith('.gz'):
+            fastq_file += '.fq'        
+        
+        #Align each to sim - output fastq file
         if self.options.stampy_premap_w_bwa == 1:
             args = ['stampy.py', '-v3', '--inputformat=fastq', '--substitutionrate=%s' % self.options.stampy_substitution_rate,
                 '--bwaoptions="-q10 %s"' % parent1, '-g',  
@@ -434,15 +453,20 @@ class ParseAndMap(CommandLineApp):
         parent2 = self.options.parent2
 
         print bcolors.OKBLUE + "Mapping reads to genomes" + bcolors.ENDC
-    
+        
         barcodes_file = open(self.options.barcodes_file,'r')
         barcodes_file.readline()##ignore first two lines of barcodes file
         barcodes_file.readline()
         sample_num = 0 ##0.2.6
         for ind in self.bc:
             sample_num +=1 ##0.2.6
+            #Do some figuring to get at the fastq file our previous parsing hath made
             fastq_file_name = 'indiv' + ind[1] + '_' + ind[0]
             fastq_file = './' + raw_data + '_parsed/' + fastq_file_name
+            #But wait, maybe the parsed fastq file was gzipped so try if it it doesn't exist.
+            if not os.path.exists(fastq_file):
+                fastq_file += '.gz'
+                assert os.path.exists(fastq_file),"File %s could not be found.  Something has gone wrong." % fileq_file
 
             #Change format for sim - output sam file
             aln_par1_sam = './' + raw_data + '_sam_files/aln_' + fastq_file_name + "_" + par1 + ".sam"

@@ -319,12 +319,12 @@ if( $update_genomes ) {
 
 ## -------------------------------------------------------------------------------
 ##
-## Use BWA to align raw reads against genomes, creating two sam files for each individual
+## Use BWA to align raw reads against genomes, creating two sam files for each parent ref
 for $sp (keys %genomes_fa) {
 	-e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}" ;
 
 	($genomes{$sp}, $d, $s) = fileparse $genomes_fa{$sp}, qr/\.[^.]*$/ ;
-	$s eq ".fa" or $s eq ".fasta" or print "$sp genome extension is $s: expecting .fa or .fasta\n" ;
+	$s eq ".fa" or $s eq ".fasta" or $s eq ".gz" or print "$sp genome extension is $s: expecting .fa or .fasta\n" ;
 	
 	if ($parse_or_map eq 'parse-only') {
 		### reformat for samtools (60 chars per line)

@@ -15,6 +15,8 @@ printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$s
 my %default_params = (
         parent1        => 'NULL',
         parent2        => 'NULL',
+        parent1_reads  => 'NULL',
+        parent2_reads  => 'NULL',
         bwaindex1      => 'bwtsw',
         bwaindex2      => 'bwtsw',
         cluster        => '1',
@@ -37,8 +39,9 @@ my %default_params = (
         debug => '0',
     );
 
-my %params = Utils::parse_config('update.cfg', %default_params);
-Utils::validate_config(%params, qw( parent1 parent2 ));
+my $params = Utils::parse_config('update.cfg', \%default_params);
+Utils::validate_config($params, qw( parent1 parent2 parent1_reads parent2_reads));
+my %params = %$params;
 
 ####################################################################################################
 

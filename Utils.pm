@@ -38,7 +38,8 @@ sub test_dependencies {
 sub parse_config {
     #Read in msg.cfg or other specified file and update where needed
     
-    my ($cfg_path, %default_params) = @_;
+    my ($cfg_path, $default_params) = @_;
+    my %default_params = %$default_params;
 
     die "ERROR: Can't locate $cfg_path.\n" unless (-e $cfg_path);
     open (IN, $cfg_path) || die "ERROR: Can't open $cfg_path: $!\n";
@@ -69,26 +70,23 @@ sub parse_config {
     else {
         $default_params{'addl_qsub_option_for_pe'} = '';
     }
-    return %default_params;
+    return \%default_params;
 }
 
 sub validate_config {
     #Check that params were entered correctly and nothing essential is missing
-
-    my (%params, @required_file_paths) = @_;
-
+    my ($params, @required_file_paths) = @_;
     ### check if all files exist
     foreach my $param (@required_file_paths) {
-        if (exists $params{$param}) {
-            die "Exiting from msgCluster: Missing file $params{$param}.\n" unless (-e $params{$param});
+        if (exists $params->{$param}) {
+            die "Exiting from msgCluster: Missing file $params->{$param}.\n" unless (-e $params->{$param});
         }
     }
-    
     print "\nParameters:\n\n";
     ### double check if the minimum exist
-    foreach my $key (sort keys %params) {
-        die "ERROR (msgCluster): undefined parameter ($key) in config file.\n" unless ($params{$key} ne 'NULL');
-        print "$key:\t$params{$key}\n" ;
+    foreach my $key (sort keys %$params) {
+        die "ERROR (msgCluster): undefined parameter ($key) in config file.\n" unless ($params->{$key} ne 'NULL');
+        print "$key:\t$params->{$key}\n" ;
     }
     print "\n" ;
 }
