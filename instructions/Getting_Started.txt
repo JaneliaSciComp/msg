@@ -15,21 +15,48 @@ indicated in parentheses):
 - biopython-1.53
 - Pyrex-0.9.9
 - pysam-0.1.2 (apply fix*)
+  R (version 2.12.2)
 - R packages (HiddenMarkov 1.3-1, zoo 1.6-2, R.methodsS3 1.2.0 and R.oo 1.7.3)
 - Perl Modules (IO::Uncompress::Gunzip)
     -- A command like this should work on Unix Desktop Systems:
     -- perl -MCPAN -e 'install IO::Uncompress::Gunzip'
 *http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0
 
+
+First Run:
+---------------------------------------------------
+
 Setting up the MSG analysis directory
 Note that all data files must be located within your MSG analysis directory (links to files are acceptable).
 Also note that quality values in the sequence fastq files must be in Sanger format.
 
+(Optional step) Updating Parental Reference Genomes:
+----------------------------------------------------
+MSG has the option to update the reference genomes of the parents from fastq files.
+
+Create a file called "update.cfg" to store the parameters for the update run. 
+(It is best to copy the file from msg/example/update.cfg)
+Edit that file as needed.
+
+Next run:
+$ perl msg/msgUpdateParentals.pl
+
+This command will create fasta files that are the updated reference genomes.  It will print the names of these 
+files at the end of its output.
+
+In the steps below when running standard MSG make sure you update the "parent1" and "parent2"
+parameters in msg.cfg with the names of these outputted files.
+
+
+A Standard MSG run:
+------------------------------------------------------
+
 1. Create a text file called “msg.cfg”. This file will specify the location of your data files, and a few other
-details. You can find an example of an msg.cfg file here:
-http://genomics.princeton.edu/AndolfattoLab/MSG_files/msg.cfg
-or
-example/msg.cfg
+details. You can find an example of an msg.cfg file here which is an excellent starting point:
+msg/example/msg.cfg
+(Note, if you skipped the optional step above of updating the parental genomes, you
+will want to set the "parent1" and "parent2" parameters to the names of the reference genome
+files.)
 
 2. Create a barcode file. You can find an example of a barcode file here:
 http://genomics.princeton.edu/AndolfattoLab/MSG_files/barcodes_file.txt
