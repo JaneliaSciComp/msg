@@ -3,24 +3,55 @@
 ## options(warn=2,error=recover);
 options(error=quote(q("yes")))
 
-args <- commandArgs()
-dollar0 <- substring(args[grep("^--file=", args)], 8)
+### manual param filling 
+setwd("/Users/Sean/Desktop/Andolfatto/9_12_toy")
+
+dollar0 <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/msg/blah"
+toy_indivs <- c("indivA12_AATAAG", "indivE2_CAGCCG", "indivE4_TAGGAG")
+direct <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_data"
+outdir <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_fit"
+
+args <- 
+
+-d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta"
+
+opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2L,2R,3L,3R,4", x = "X", y = "all", z = "0,.5,.5", t = 1, H = "both", e = 0.8, j = 30, l = 20)
+
+
+
+
+
+
+
+#args <- commandArgs()
+#dollar0 <- substring(args[grep("^--file=", args)], 8)
 
 source(sprintf("%s/ded.R", dirname(dollar0)))
 source(sprintf("%s/hmmlib.R", dirname(dollar0)))
 library("R.methodsS3", lib.loc = dirname(dollar0))
 library("R.oo", lib.loc = dirname(dollar0))
 
-opts <- getopts()
+
+#opts <- getopts()
 indivs <- unlist(strsplit(opts$i,split=","))
 sex <- opts$s
 dir <- opts$d
 outdir <- opts$o
 deltapar1 <- as.numeric(opts$p)
 deltapar2 <- as.numeric(opts$q)
-rfac <- as.numeric(opts$r)
+
 priors <- unlist(strsplit(opts$z,split=","))
 theta <- as.numeric(opts$t)
+HMMtype <- opts$H
+
+if(HMMtype %in% c("ML", "both")){
+	rfac <- as.numeric(opts$r)
+	}
+if(HMMtype %in% c("viterbi", "both")){
+	HMM_seqpair <- as.numeric(opts$j)
+	HMM_diffthresh <- as.numeric(opts$l)
+	HMM_decay <- as.numeric(opts$e)
+	}	
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -42,7 +73,7 @@ plotPadding <- 10^(ceiling(log10(aveSpace))-2)
 
 alleles <- c("A","C","G","T")
 
-
+indiv <- indivs
 for(indiv in indivs) {
     cat(indiv, "\n")
     ## if(opts$c == "all")
