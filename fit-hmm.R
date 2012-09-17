@@ -3,34 +3,15 @@
 ## options(warn=2,error=recover);
 options(error=quote(q("yes")))
 
-### manual param filling 
-setwd("/Users/Sean/Desktop/Andolfatto/9_12_toy")
-
-dollar0 <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/msg/blah"
-dollar0 <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/msg"
-toy_indivs <- c("indivA12_AATAAG", "indivE2_CAGCCG", "indivE4_TAGGAG")
-direct <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_data"
-outdir <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_fit"
-
-#opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2L,2R,3L,3R,4", x = "X", y = "all", z = "0,.5,.5", t = 1, H = "both", e = 0.8, j = 30, l = 20)
-opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2R", x = NULL, y = "all", z = "0,.5,.5", t = 1, H = "ML,viterbi", e = 0.8, j = 30, l = 20)
-
-
-
-
-
-
-
-#args <- commandArgs()
-#dollar0 <- substring(args[grep("^--file=", args)], 8)
+args <- commandArgs()
+dollar0 <- substring(args[grep("^--file=", args)], 8)
 
 source(sprintf("%s/ded.R", dirname(dollar0)))
 source(sprintf("%s/hmmlib.R", dirname(dollar0)))
 library("R.methodsS3", lib.loc = dirname(dollar0))
 library("R.oo", lib.loc = dirname(dollar0))
 
-
-#opts <- getopts()
+opts <- getopts()
 indivs <- unlist(strsplit(opts$i,split=","))
 sex <- opts$s
 dir <- opts$d
@@ -49,7 +30,6 @@ if("viterbi" %in% HMMtype){
 	HMM_seqpair <- as.numeric(opts$j)
 	HMM_diffthresh <- as.numeric(opts$l)
 	HMM_decay <- as.numeric(opts$e)
-	vit_bp_calls <- list()
 	}	
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
@@ -72,7 +52,6 @@ plotPadding <- 10^(ceiling(log10(aveSpace))-2)
 
 alleles <- c("A","C","G","T")
 
-indiv <- indivs
 for(indiv in indivs) {
     cat(indiv, "\n")
     ## if(opts$c == "all")
@@ -235,9 +214,6 @@ for(indiv in indivs) {
             data$est <- apply(prob, 1, which.max)
             
 
-            rand_bp <- round(runif(1, min = 10, max = L-10))
-           	prob <- rbind(rdirichlet(L - rand_bp, c(0, 0.95, 0.05)), rdirichlet(rand_bp, c(0, 0.05, 0.95))) 
-           
             ## Posterior probability
             
             if("ML" %in% HMMtype){
@@ -251,32 +227,32 @@ for(indiv in indivs) {
 				if(ploidy == 2){zero <- matrix(c(1,6,3,4), ncol =2, byrow = TRUE)}
 				if(ploidy == 1){zero <- NULL}
 
-			Int <- 1
+				Int <- 1
 			
-			if(length(prob[,1]) > 1){
-			#Run Viterbi-HMM forward and backwards and output the state sequence
-			dual.hmm <- new.HMM_pathFR(phi, d, prob, zero, HMM_decay, r, Int)
-			datapos <- data$pos
-				
-			#Compare recombination events called by foward and reverse HMM runs and determine a consensus, likely set of recombinations
-			conc.hap <- new.HMM_path.consensus(dual.hmm, contig, K, data$pos)
+				if(length(prob[,1]) > 1){
+					#Run Viterbi-HMM forward and backwards and output the state sequence
+					dual.hmm <- new.HMM_pathFR(phi, d, prob, zero, HMM_decay, r, Int)
+					datapos <- data$pos
+						
+					#Compare recombination events called by foward and reverse HMM runs and determine a consensus, likely set of recombinations
+					conc.hap <- new.HMM_path.consensus(dual.hmm, contig, K, data$pos)
+					
+					Pr.z.given.y_vit <- t(sapply(1:L, function(x){ifelse(1:K == conc.hap$Ancestry[x], 1, 0)}))
+					
+					if(length(unique(conc.hap$Ancestry)) != 1){	
+					#gradient based on ambiguous breakpoint boundaries
 			
-			Pr.z.given.y_vit <- t(sapply(1:L, function(x){ifelse(1:K == conc.hap$Ancestry[x], 1, 0)}))
-			
-			if(length(unique(conc.hap$Ancestry)) != 1){	
-			#gradient based on ambiguous breakpoint boundaries
-			
-			for(recon in 1:length(conc.hap$recoZ[,1])){
-				reco <- conc.hap$recoZ[recon,]
-				interpol_p <- 1 - (datapos[reco$mark_start:reco$mark_end] - datapos[reco$mark_start])/(datapos[reco$mark_end] - datapos[reco$mark_start])
-				
-				Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$starthap] <- interpol_p
-				Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$endhap] <- 1-interpol_p
-				}}
+						for(recon in 1:length(conc.hap$recoZ[,1])){
+							reco <- conc.hap$recoZ[recon,]
+							interpol_p <- 1 - (datapos[reco$mark_start:reco$mark_end] - datapos[reco$mark_start])/(datapos[reco$mark_end] - datapos[reco$mark_start])
+							
+							Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$starthap] <- interpol_p
+							Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$endhap] <- 1-interpol_p
+							}
+						}
+					}
+				colnames(Pr.z.given.y_vit) <- paste("viterbi Pr(", ancestries, "|y)")
 				}
-			colnames(Pr.z.given.y_vit) <- paste("viterbi Pr(", ancestries, "|y)")
-			vit_bp_calls[[indiv]][[contig]] <- conc.hap$recoZ
-			}
 
 			if("ML" %in% HMMtype){data <- cbind(data, Pr.z.given.y_ML)}
 			if("viterbi" %in% HMMtype){data <- cbind(data, Pr.z.given.y_vit)}
