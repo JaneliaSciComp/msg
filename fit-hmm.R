@@ -7,15 +7,13 @@ options(error=quote(q("yes")))
 setwd("/Users/Sean/Desktop/Andolfatto/9_12_toy")
 
 dollar0 <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/msg/blah"
+dollar0 <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/msg"
 toy_indivs <- c("indivA12_AATAAG", "indivE2_CAGCCG", "indivE4_TAGGAG")
 direct <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_data"
 outdir <- "/Users/Sean/Desktop/Andolfatto/9_12_toy/hmm_fit"
 
-args <- 
-
--d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta"
-
-opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2L,2R,3L,3R,4", x = "X", y = "all", z = "0,.5,.5", t = 1, H = "both", e = 0.8, j = 30, l = 20)
+#opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2L,2R,3L,3R,4", x = "X", y = "all", z = "0,.5,.5", t = 1, H = "both", e = 0.8, j = 30, l = 20)
+opts <- list(s = "male", i = toy_indivs[1], d = direct, o = outdir, p = 0.1, q = 0.1, r = 0.000001, c = "2R", x = NULL, y = "all", z = "0,.5,.5", t = 1, H = "ML,viterbi", e = 0.8, j = 30, l = 20)
 
 
 
@@ -42,15 +40,16 @@ deltapar2 <- as.numeric(opts$q)
 
 priors <- unlist(strsplit(opts$z,split=","))
 theta <- as.numeric(opts$t)
-HMMtype <- opts$H
+HMMtype <- unlist(strsplit(opts$H, ","))
 
-if(HMMtype %in% c("ML", "both")){
+if("ML" %in% HMMtype){
 	rfac <- as.numeric(opts$r)
 	}
-if(HMMtype %in% c("viterbi", "both")){
+if("viterbi" %in% HMMtype){
 	HMM_seqpair <- as.numeric(opts$j)
 	HMM_diffthresh <- as.numeric(opts$l)
 	HMM_decay <- as.numeric(opts$e)
+	vit_bp_calls <- list()
 	}	
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
@@ -168,19 +167,21 @@ for(indiv in indivs) {
                 r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
 				}
 
-            d <- c(NA, diff(data$pos))
-            p <- 1 - exp(-r*d*rfac)
-            Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
-            if(ploidy == 2) {
-                Pi[,"par1/par1","par1/par1"] <- Pi[,"par1/par2","par1/par2"] <- Pi[,"par2/par2","par2/par2"] <- 1-p
-                Pi[,"par1/par1","par1/par2"] <- Pi[,"par1/par2","par1/par1"] <- Pi[,"par1/par2","par2/par2"] <- Pi[,"par2/par2","par1/par2"] <- p
-                Pi[,"par1/par1","par2/par2"] <- Pi[,"par2/par2","par1/par1"] <- 0
-            } else {
-                Pi[,"par1","par1"] <- Pi[,"par2","par2"] <- 1-p
-                Pi[,"par1","par2"] <- Pi[,"par2","par1"] <- p
-            }
-            Pi[1,,] <- NA
-            
+           	if("ML" %in% HMMtype){
+		        d <- c(NA, diff(data$pos))
+	            p <- 1 - exp(-r*d*rfac)
+           	   	Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
+	            if(ploidy == 2) {
+	                Pi[,"par1/par1","par1/par1"] <- Pi[,"par1/par2","par1/par2"] <- Pi[,"par2/par2","par2/par2"] <- 1-p
+	                Pi[,"par1/par1","par1/par2"] <- Pi[,"par1/par2","par1/par1"] <- Pi[,"par1/par2","par2/par2"] <- Pi[,"par2/par2","par1/par2"] <- p
+	                Pi[,"par1/par1","par2/par2"] <- Pi[,"par2/par2","par1/par1"] <- 0
+	            } else {
+	                Pi[,"par1","par1"] <- Pi[,"par2","par2"] <- 1-p
+	                Pi[,"par1","par2"] <- Pi[,"par2","par1"] <- p
+	            }
+	            Pi[1,,] <- NA
+	            }
+	            
             ## Allele frequencies in parental backgrounds
             ppar1 <- ppar2 <- matrix(NA, nrow=4, ncol=4, dimnames=list(alleles, alleles))
             ppar1[] <- deltapar1/3
@@ -233,12 +234,54 @@ for(indiv in indivs) {
             data <- cbind(data, prob)
             data$est <- apply(prob, 1, which.max)
             
+
+            rand_bp <- round(runif(1, min = 10, max = L-10))
+           	prob <- rbind(rdirichlet(L - rand_bp, c(0, 0.95, 0.05)), rdirichlet(rand_bp, c(0, 0.05, 0.95))) 
+           
             ## Posterior probability
-            hmm <- forwardback.ded(Pi=Pi, delta=phi, prob=prob)
-            #hmm <- forwardback.ded(Pi=Pi, delta=rep(1/K, K), prob=prob)
-            Pr.z.given.y <- exp(hmm$logalpha + hmm$logbeta - hmm$LL)
-            colnames(Pr.z.given.y) <- paste("Pr(", ancestries, "|y)")
-            data <- cbind(data, Pr.z.given.y)
+            
+            if("ML" %in% HMMtype){
+	            hmm <- forwardback.ded(Pi=Pi, delta=phi, prob=prob)
+	            #hmm <- forwardback.ded(Pi=Pi, delta=rep(1/K, K), prob=prob)
+	            Pr.z.given.y_ML <- exp(hmm$logalpha + hmm$logbeta - hmm$LL)
+	            colnames(Pr.z.given.y_ML) <- paste("ML Pr(", ancestries, "|y)")
+           		}
+			if("viterbi" %in% HMMtype){
+				
+				if(ploidy == 2){zero <- matrix(c(1,6,3,4), ncol =2, byrow = TRUE)}
+				if(ploidy == 1){zero <- NULL}
+
+			Int <- 1
+			
+			if(length(prob[,1]) > 1){
+			#Run Viterbi-HMM forward and backwards and output the state sequence
+			dual.hmm <- new.HMM_pathFR(phi, d, prob, zero, HMM_decay, r, Int)
+			datapos <- data$pos
+				
+			#Compare recombination events called by foward and reverse HMM runs and determine a consensus, likely set of recombinations
+			conc.hap <- new.HMM_path.consensus(dual.hmm, contig, K, data$pos)
+			
+			Pr.z.given.y_vit <- t(sapply(1:L, function(x){ifelse(1:K == conc.hap$Ancestry[x], 1, 0)}))
+			
+			if(length(unique(conc.hap$Ancestry)) != 1){	
+			#gradient based on ambiguous breakpoint boundaries
+			
+			for(recon in 1:length(conc.hap$recoZ[,1])){
+				reco <- conc.hap$recoZ[recon,]
+				interpol_p <- 1 - (datapos[reco$mark_start:reco$mark_end] - datapos[reco$mark_start])/(datapos[reco$mark_end] - datapos[reco$mark_start])
+				
+				Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$starthap] <- interpol_p
+				Pr.z.given.y_vit[reco$mark_start:reco$mark_end,reco$endhap] <- 1-interpol_p
+				}}
+				}
+			colnames(Pr.z.given.y_vit) <- paste("viterbi Pr(", ancestries, "|y)")
+			vit_bp_calls[[indiv]][[contig]] <- conc.hap$recoZ
+			}
+
+			if("ML" %in% HMMtype){data <- cbind(data, Pr.z.given.y_ML)}
+			if("viterbi" %in% HMMtype){data <- cbind(data, Pr.z.given.y_vit)}
+			
+			data <- cbind(data, Pr.z.given.y_ML, Pr.z.given.y_vit)
             attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
         
@@ -259,16 +302,20 @@ for(indiv in indivs) {
     plotfile <- file.path(outdir, indiv, paste(indiv, "hmmprob.pdf", sep="-"))
     if(file.exists(plotfile)) { cat("plot already exists\n") ; next }
     pdf(file=plotfile, width=7, height=1.5)
+    
     par(mar=c(2,2.5,0.5,0.5),bg="transparent",cex.main=.68,cex.lab=.8,font.lab=2,cex.axis=.38,mgp=c(1,.000001,0),xaxs="i")
+
+	for(hmmRunning in HMMtype){
 
 	 plot(0, 0, xlab="", ylab="", col="transparent", xlim=c(1,sum(as.numeric(contigLengths$length)) + plotPadding*(length(plot.contigs)+1)), ylim=c(-1.01,1.01), axes=F) 
 
 	 axis(side=2,at=c(-1,0,1),labels=c("","",""),col="gray38");
 	 mtext(c("par2","par1"),side=2,line=.68,at=c(-1,1),font=2,cex=.8,col=c("blue","red"),las=2);
-	 box(col="gray68"); 
+	 mtext(paste("HMM:", hmmRunning, collapse = " "), side = 2, line = -0.8, at = -1.4, font=2, cex=0.6, las=2)
+	 box(col="gray68");
     
 	 current_start	<- plotPadding;
-    for(contig in plot.contigs) {
+	 for(contig in plot.contigs) {
 
         mtext(side=1,at=current_start,contig,font=2,cex=.8,line=1,xpd=T,adj=0)
         current_end <- current_start + contigLengths[contigLengths$chr == contig,"length"] - 1;
@@ -289,31 +336,31 @@ for(indiv in indivs) {
         if (sum(names(dataa) %in% contig)!=0) {
             contig_data <- dataa[[contig]];
             x <- contig_data$pos
-            y <- contig_data[,paste("Pr(", ancestries, "|y)")]
+            y <- contig_data[,paste(hmmRunning, "Pr(", ancestries, "|y)")]
 	
 				### divvy up homozygous and heterozygous blocks
-            byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95);
+            byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95, hmmRunning);
             if (is.null(byBlocks[["bps"]])==F) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
 
 				### plot
             like.par1 <- contig_data[contig_data$read_allele==contig_data$par1ref,]$pos;
             like.par2 <- contig_data[contig_data$read_allele==contig_data$par2ref,]$pos;
             plot.posterior(x+current_start, y, ancestries, like.par1+current_start, like.par2+current_start, bounds=c(1,contigLengths[contigLengths$chr==contig,]$length)+current_start-1, subtract=current_start, tickwidth=5*10^7)
-
+			
             ### report mismatch fraction for homozygous regions
 				if (nrow(byBlocks[["blocks"]])>0) {
 					## plot fraction of par1/(par1+par2) among informative markers (between -1 and 1)
-            	matchMismatch <- rbind(matchMismatch, reportCounts(contig_data, as.vector(byBlocks[["blocks"]][,"V1"]), as.vector(byBlocks[["blocks"]][,"V4"]), as.numeric(as.vector(byBlocks[["blocks"]][,"V7"])), as.numeric(as.vector(byBlocks[["blocks"]][,"V8"]))))
+            	matchMismatch <- rbind(matchMismatch, cbind(reportCounts(contig_data, as.vector(byBlocks[["blocks"]][,"V1"]), as.vector(byBlocks[["blocks"]][,"V4"]), as.numeric(as.vector(byBlocks[["blocks"]][,"V7"])), as.numeric(as.vector(byBlocks[["blocks"]][,"V8"]))), hmmtype = hmmRunning))
 
             }
         }
 
         current_start <- current_start + contigLengths[contigLengths$chr == contig,"length"] + plotPadding;
         if (contig != plot.contigs[length(plot.contigs)]) {
-				abline(v=current_start-(plotPadding/2),col="gray68",lwd=1)
+					abline(v=current_start-(plotPadding/2),col="gray68",lwd=1)
         }
     }
-
+    }
     etc <- ""
     main <- sprintf("%s (%s): delta=(%.0e, %.0e)", indiv, sex, deltapar1, deltapar2)
     dev.off()

@@ -238,11 +238,11 @@ findBreak <- function(indiv,contig,y,z1,z2,conf1,conf2,parentage) {
 	list(blocks=as.data.frame(blocks),bps=as.data.frame(widths));
 }
 
-breakpoint.width <- function(x, y1, y2, indiv=NA, contig=NA, conf1=.05 ,conf2=.95) {
+breakpoint.width <- function(x, y1, y2, indiv=NA, contig=NA, conf1=.05 ,conf2=.95, hmmtype) {
 	width1 <- findBreak(indiv,contig,y1,y1>=conf1,y1<=conf2,conf1,conf2,'homozygous_par1')
 	width2 <- findBreak(indiv,contig,y2,y2>=conf1,y2<=conf2,conf1,conf2,'homozygous_par2')
 
-	list(blocks=rbind(width1[["blocks"]],width2[["blocks"]]),bps=rbind(width1[["bps"]],width2[["bps"]]))
+	list(blocks=cbind(rbind(width1[["blocks"]],width2[["blocks"]]), hmmtype),bps=cbind(rbind(width1[["bps"]],width2[["bps"]]), hmmtype))
 }	
 
 
@@ -814,3 +814,273 @@ cleanupReadPileup <- function(x, ref) {
     x <- mapply(gsub, pattern=list("[\\.,]"), replacement=ref, x=x)
 	 return(x);
 }
+
+#Write a transition matrix
+
+TransMat <- function(drI, a, nstates, zerocells){
+	tMat <- matrix(data = 0, ncol = nstates*2, nrow = nstates*2)
+	diag(tMat[1:nstates,1:nstates]) <- 1-drI
+	diag(tMat[(nstates+1):(2*nstates), 1:nstates]) <- drI
+	tMat[1:nstates, (nstates+1):(2*nstates)] <- a; diag(tMat[1:nstates, (nstates+1):(2*nstates)]) <- 0
+	diag(tMat[(nstates+1):(2*nstates), (nstates+1):(2*nstates)]) <- a
+	if(!is.null(zerocells)){
+	tMat[zerocells[,1],zerocells[,2]] <- 0}
+	tMat
+	}
+
+HMMeval = function(phi, d, prob, zero, a, r, Int){
+
+nstates <- length(phi)
+npos <- length(d)
+phis <- as.numeric(c(phi, rep(0, times = nstates)))
+drI <- d*r*Int
+
+#delta - state-probability matrix
+deltad <- matrix(data = NA, ncol = nstates*2, nrow = npos)
+
+#psi - state matrix
+psid <- matrix(data = NA, ncol = nstates*2, nrow = npos)
+
+#initialization
+
+deltad[1,] <- log(phis*c(rep(prob[1,], times = 2)), base = 2)
+psid[1,] <- rep(0, times = 6)
+
+#recursion:
+
+for (i in 2:npos){
+
+	Ad <- TransMat(drI[i], a, nstates, zero)
+	betad <- matrix(data = 0, ncol = nstates*2, nrow = nstates*2)
+	for (j in 1:(nstates*2)){
+		betad[j,] <- deltad[i-1,j]+log(Ad[j,], base = 2)+log(c(rep(prob[i,], times = 2)), base = 2)
+		}	
+
+	for (j in 1:nstates){
+		if(diag(betad)[j] == max(diag(betad)[1:nstates])){
+		deltad[i,j] <- diag(betad)[j]
+		psid[i,j] <- j
+		}else{
+			deltad[i,j] <- diag(betad[c((nstates+1):(nstates*2)),c(1:nstates)])[j]
+			psid[i,j] <- j+nstates
+			}
+		}
+	for (j in (nstates+1):(2*nstates)){
+		deltad[i,j] <- max(betad[,j])
+		psid[i,j] <- c(1:(nstates*2))[betad[,j] == max(betad[,j])][1]
+		}	
+	}
+
+#termination:
+finald = max(deltad[npos,][1:nstates])
+finpsid = c(1:nstates)[deltad[npos,][1:nstates] == finald]
+
+#path (state sequence) backtracking
+path = rep(NA, times = npos)
+path[npos] = finpsid
+for (i in (npos-1):1){
+	path[i] <- psid[i+1,path[i+1]]
+	}
+path
+}
+
+### remove recombination events that occur close together in f or r hmmpath - <20 markers
+### pair forward and reverse HMM-run recombination events ###
+#freco <- forwardtrans
+#rreco <- reversetrans
+
+validrecos = function(freco, rreco){
+
+dirSort <- rbind(cbind(dir = "F", freco, valid = NA), cbind(dir = "R", rreco, valid = NA))
+dirSort <- dirSort[order(dirSort$bpst),]
+
+#if F-R ancestries disagree, get rid of the most telomeric recombination events to get the telomeric ancestries to agree
+
+telomeric <- TRUE
+current.trans <- NA
+
+for(i in 1:length(dirSort[,1])){
+direction = dirSort[i,1]
+comp.dir = ifelse(direction == "F", "R", "F")
+
+if(telomeric == TRUE){
+if(paste(dirSort[i,4:5], collapse = "-") != paste(dirSort[dirSort$dir == comp.dir,][1,4:5], collapse = "-")){
+dirSort[i,6] <- FALSE}else{
+	current.trans <- paste(dirSort[i,4:5], collapse = "-")
+	telomeric <- FALSE}} else if(is.na(current.trans)){
+current.trans <- paste(dirSort[i,4:5], collapse = "-")	} else {
+if(paste(dirSort[i,4:5], collapse = "-") == current.trans){
+	dirSort[(i-1):i,6] <- TRUE
+	current.trans <- NA} else {
+	dirSort[(i-1):i,6] <- FALSE
+	current.trans <- NA
+	}
+	}		
+	}		
+
+dirSort <- dirSort[dirSort$valid == TRUE,]
+
+output <- NULL
+if(length(dirSort[,1]) != 0){
+for(i in 1:(length(dirSort[,1])/2)){
+
+outz <- cbind(dirSort[(i*2)-1,2], dirSort[(i*2),2], dirSort[(i*2)-1,3], dirSort[(i*2),3:5], mean(c(dirSort[(i*2)-1,2], dirSort[(i*2),2])))
+colnames(outz) <- c("bp_start", "bp_end", "mark_start", "mark_end", "starthap", "endhap", "bp_mean")
+output <- rbind(output, outz)
+}}
+output
+}
+
+#switch the polarity of the markbp, starthap <-> endhap
+reverseSwitch = function(reversetrans, lpath){
+	revorder = data.frame(marks = rev(reversetrans[,1]), markbp = rev(reversetrans[,2]), paths = rev(reversetrans[,3]), pathf = rev(reversetrans[,4]))
+	for(i in 1:length(revorder[,1])){
+		revorder[i,2] <- lpath - revorder[i,2]
+		paths <- revorder[i,3]
+		pathf <- revorder[i,4]
+		revorder[i,3] <- pathf
+		revorder[i,4] <- paths
+		}
+		revorder
+	}
+
+#### recombinations going forward and reverse ####
+recoZ = function(path, position){
+	pathl = rle(path)$lengths
+	pathv = rle(path)$values
+
+	cuml = cumsum(pathl)	
+	cumpos = position[cuml]	
+	nbreaks = (length(cumpos)-1)/2
+	starts = cumpos[c(1:nbreaks)*2-1]
+	starthap = pathv[c(1:nbreaks)*2-1]
+	endhap = pathv[c(1:nbreaks)*2+1]	
+	markbp = cuml[c(1:nbreaks)*2-1]
+	data.frame(starts = starts, markbp = markbp, starthap = starthap, endhap = endhap)	}
+
+#### define haplotype after filtering possible recombination events 
+
+cons_haplotype <- function(validrecoZ, npos, Pos){
+
+for(i in 1:length(validrecoZ[,1])){
+
+if(validrecoZ$mark_start[i] == validrecoZ$mark_end[i]){
+if(Pos[validrecoZ$mark_start[i] + 1] - Pos[validrecoZ$mark_start[i]] > Pos[validrecoZ$mark_start[i]] - Pos[validrecoZ$mark_start[i] - 1]){
+	validrecoZ$bp_mean[i] <- validrecoZ$bp_mean[i] - 1
+	}else{
+	validrecoZ$bp_mean[i] <- validrecoZ$bp_mean[i] + 1	
+	}}}
+
+for(i in 1:length(validrecoZ[,1])){
+
+for(i in 1:length(validrecoZ[,1])){
+validrecoZ[i,8] <- c(1:(npos-1))[mapply(between.val, low = Pos[c(1:(npos-1))], high = Pos[c(2:npos)], validrecoZ[i,7])]	
+	}
+validrecoZ[,9] <- validrecoZ[,8]+1	
+	}
+
+
+if(length(validrecoZ[,1]) == 1){
+track <- c(rep(validrecoZ[i,5], times = validrecoZ[i,8]), rep(validrecoZ[i,6], times = npos - validrecoZ[i,9] + 1))
+}else{
+	validrecoZ <- validrecoZ[order(validrecoZ[,8]),]
+	starts <- sort(validrecoZ[,8])
+	track <- NULL
+	for(i in 1:length(starts)){
+	if(i == 1){
+	track <- c(track, rep(validrecoZ[i,5], times = validrecoZ[i,8]))
+	}
+	else if(i == length(starts)){
+	track <- c(track, rep(validrecoZ[i,5], times = validrecoZ[i,8] - validrecoZ[i-1,9]), rep(validrecoZ[i,6], times = npos - validrecoZ[i,8] + 1))
+	}
+	else{
+	track <- c(track, rep(validrecoZ[i,5], times = validrecoZ[i,8] - validrecoZ[i-1,9] + 1))
+}}}
+track
+}
+
+between.val <- function(test, low, high){
+	(high - test) * (test - low) > 0
+	}
+
+new.HMM_pathFR <- function(phi, d, prob, zero, a, r, Int){
+
+hmmpath = HMMeval(phi, d, prob, zero, a, r, Int)
+
+probR <- prob[rev(c(1:length(d))),]
+dR <- rev(d)
+dR <- c(NA, dR); dR <- dR[-length(dR)]
+
+hmmpathr = rev(HMMeval(phi, dR, probR, zero, a, r, Int))
+
+cbind(hmmpath, hmmpathr)	
+
+}
+
+new.HMM_path.consensus <- function(dual.hmm, contig, nstates, Pos){
+
+#define breakpoint by transition from haplotype 1 state to memory state going forward and by transition from haplotype 2 state to memory state going in reverse.
+npos <- length(Pos)
+revPos <- rev(Pos)
+
+if(sum(c(1:nstates) %in% unique(dual.hmm[,1])) > 1){
+	forwardtrans <- recoZ(dual.hmm[,1], Pos)
+	forwardtrans <- cbind("F", forwardtrans)
+	} else { forwardtrans <- data.frame("F", NA, NA, sort(unique(dual.hmm[,1]))[1], sort(unique(dual.hmm[,1]))[1])}
+
+names(forwardtrans) <- c("dir", "bpst", "markst", "starthap", "endhap")
+
+if(sum(c(1:nstates) %in% unique(dual.hmm[,2])) > 1){
+	reverset = recoZ(rev(dual.hmm[,2]), revPos)
+	reversetrans = reverseSwitch(reverset, npos+1)
+	reversetrans <- cbind("R", reversetrans)
+	} else { reversetrans <- data.frame("R", NA, NA, sort(unique(dual.hmm[,2]))[1], sort(unique(dual.hmm[,2]))[1])}
+
+names(reversetrans) <- c("dir", "bpst", "markst", "starthap", "endhap")
+possiblerec <- rbind(forwardtrans, reversetrans)
+row.names(possiblerec) <- NULL
+
+freco <- forwardtrans[,-c(1)]
+rreco <- reversetrans[,-c(1)]
+c.hap <- list()
+
+if(is.na(freco[1,1]) | is.na(rreco[1,1])){
+ancestry <- ifelse(is.na(freco[1,1]), freco[1,3], rreco[1,3])
+c.hap[["Ancestry"]] <- rep(ancestry, times = npos)
+c.hap[["recoZ"]] <- NULL
+} else {
+
+validrecoZ <- validrecos(freco, rreco)
+
+if(is.null(validrecoZ)){
+ancestry <- as.numeric(names(table(dual.hmm))[table(dual.hmm) == max(table(dual.hmm))])
+c.hap[["Ancestry"]] <- rep(ancestry, times = npos)
+c.hap[["recoZ"]] <- NULL
+
+}else{
+
+c.hap[["Ancestry"]] <- cons_haplotype(validrecoZ, npos, Pos)
+c.hap[["recoZ"]] <- validrecoZ
+}}
+c.hap
+}
+
+#define breakpoint regions
+recombs = function(hmmpath, parcount){
+	pathl = rle(hmmpath)$lengths
+	pathv = rle(hmmpath)$values
+
+	cuml = cumsum(pathl)	
+	cumpos = parcount[cuml]	
+	nbreaks = (length(cumpos)-1)/2
+	starts = cumpos[c(1:nbreaks)*2-1]
+	markbp = cuml[c(1:nbreaks)*2-1]
+	marktrans = cuml[c(1:nbreaks)*2]-cuml[c(1:nbreaks)*2-1]
+	int = cumpos[c(1:nbreaks)*2]-cumpos[c(1:nbreaks)*2-1]
+	starthap = pathv[c(1:nbreaks)*2-1]
+	endhap = pathv[c(1:nbreaks)*2+1]	
+	data.frame(starts = starts, int = int, markbp = markbp, marktrans = marktrans, starthap = starthap, endhap = endhap)	
+}
+
+
+
