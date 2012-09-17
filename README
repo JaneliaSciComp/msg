@@ -7,7 +7,7 @@ http://www.ncbi.nlm.nih.gov/pubmed/21233398
   Run test_dependencies.sh to check for the existence of dependencies
 Python (2.6.4)
 bwa (0.5.7)
-samtools (0.1.9-3)
+samtools (0.1.9-3)  ! Newer versions of Samtools will not work !
 biopython-1.53
 Pyrex-0.9.9
 pysam-0.1.2 (apply fix as described here: http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0)

@@ -31,7 +31,7 @@ sub test_dependencies {
     my $last_path = getcwd();
     chdir('msg') or die "$!";
     #system_call("chmod 755 test_dependencies.sh");
-    system_call("test_dependencies.sh");
+    system_call("./test_dependencies.sh");
     chdir($last_path) or die "$!";
 }
 
