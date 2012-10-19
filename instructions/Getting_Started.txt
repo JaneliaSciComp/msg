@@ -7,9 +7,17 @@ $ tar zxf msg-version.tar.gz
 $ cd msg_version/
 $ make
 
-Please ensure that the following dependencies are installed before running MSG (working versions are
-indicated in parentheses):
-- Python (2.6.4)
+OR clone from github:
+$ git clone git://github.com/JaneliaSciComp/msg.git
+$ cd msg
+$ make
+
+
+Please ensure that the following dependencies are installed before running MSG (working versions are indicated in parentheses):
+
+WARNING: At least bwa, samtools, R, and the R packages MUST be the version noted above; Not the latest versions.
+
+- Python (2.6.4 or later but not 3.*)
 - bwa (0.5.7)
 - samtools (0.1.9-3)
 - biopython-1.53
@@ -21,6 +29,7 @@ indicated in parentheses):
     -- A command like this should work on Unix Desktop Systems:
     -- perl -MCPAN -e 'install IO::Uncompress::Gunzip'
 *http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0
+
 
 
 First Run:
@@ -57,6 +66,8 @@ msg/example/msg.cfg
 (Note, if you skipped the optional step above of updating the parental genomes, you
 will want to set the "parent1" and "parent2" parameters to the names of the reference genome
 files.)
+(WARNING: MSG scales poorly with the number of chromosome contigs so in msg.cfg
+you may want to switch chroms=all to specific large chromosomes e.g., chroms=2L,2R,3L,3R,4,X)
 
 2. Create a barcode file. You can find an example of a barcode file here:
 http://genomics.princeton.edu/AndolfattoLab/MSG_files/barcodes_file.txt
