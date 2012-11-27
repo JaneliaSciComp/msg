@@ -242,7 +242,18 @@ breakpoint.width <- function(x, y1, y2, indiv=NA, contig=NA, conf1=.05 ,conf2=.9
 	width1 <- findBreak(indiv,contig,y1,y1>=conf1,y1<=conf2,conf1,conf2,'homozygous_par1')
 	width2 <- findBreak(indiv,contig,y2,y2>=conf1,y2<=conf2,conf1,conf2,'homozygous_par2')
 
-	list(blocks=cbind(rbind(width1[["blocks"]],width2[["blocks"]]), hmmtype),bps=cbind(rbind(width1[["bps"]],width2[["bps"]]), hmmtype))
+	tmp <- list()
+	if(length(width1[["blocks"]]) + length(width2[["blocks"]]) != 0){
+		tmp[["blocks"]] <- cbind(rbind(width1[["blocks"]],width2[["blocks"]]), hmmtype)
+		}else{
+			tmp[["blocks"]] <- rbind(width1[["blocks"]],width2[["blocks"]])
+			}
+	if(length(width1[["bps"]]) + length(width2[["bps"]]) != 0){
+		tmp[["bps"]] <- cbind(rbind(width1[["bps"]],width2[["bps"]]), hmmtype)
+		}else{
+			tmp[["bps"]] <- rbind(width1[["bps"]],width2[["bps"]])
+			}
+	tmp
 }	
 
 

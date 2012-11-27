@@ -257,8 +257,7 @@ for(indiv in indivs) {
 			if("ML" %in% HMMtype){data <- cbind(data, Pr.z.given.y_ML)}
 			if("viterbi" %in% HMMtype){data <- cbind(data, Pr.z.given.y_vit)}
 			
-			data <- cbind(data, Pr.z.given.y_ML, Pr.z.given.y_vit)
-            attr(data, "badpos") <- badpos
+			attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
         
         }
@@ -316,7 +315,7 @@ for(indiv in indivs) {
 	
 				### divvy up homozygous and heterozygous blocks
             byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95, hmmRunning);
-            if (is.null(byBlocks[["bps"]])==F) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
+            if (nrow(byBlocks[["bps"]])>0) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
 
 				### plot
             like.par1 <- contig_data[contig_data$read_allele==contig_data$par1ref,]$pos;
