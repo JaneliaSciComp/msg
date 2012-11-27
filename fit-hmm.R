@@ -255,7 +255,7 @@ for(indiv in indivs) {
 					}
 				}
 				
-			colnames(Pr.z.given.y) <- paste("viterbi Pr(", ancestries, "|y)")
+			colnames(Pr.z.given.y) <- paste("Pr(", ancestries, "|y)")
 			data <- cbind(data, Pr.z.given.y)
 			attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
