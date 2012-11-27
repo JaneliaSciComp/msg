@@ -18,9 +18,22 @@ dir <- opts$d
 outdir <- opts$o
 deltapar1 <- as.numeric(opts$p)
 deltapar2 <- as.numeric(opts$q)
-rfac <- as.numeric(opts$r)
+
 priors <- unlist(strsplit(opts$z,split=","))
 theta <- as.numeric(opts$t)
+HMMtype <- as.character(opts$H)
+if(!(HMMtype %in% c("ML", "viterbi"))){
+	print(paste("HMMtype must be either ML or viterbi, current option is:", HMMtype))
+	}
+
+if(HMMtype == "ML"){
+	rfac <- as.numeric(opts$r)
+	}
+if(HMMtype == "viterbi"){
+	HMM_seqpair <- as.numeric(opts$j)
+	HMM_diffthresh <- as.numeric(opts$l)
+	HMM_decay <- as.numeric(opts$e)
+	}	
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -41,7 +54,6 @@ aveSpace <- sum(as.numeric(contigLengths[contigLengths$chr %in% plot.contigs,]$l
 plotPadding <- 10^(ceiling(log10(aveSpace))-2)
 
 alleles <- c("A","C","G","T")
-
 
 for(indiv in indivs) {
     cat(indiv, "\n")
@@ -137,19 +149,21 @@ for(indiv in indivs) {
                 r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
 				}
 
-            d <- c(NA, diff(data$pos))
-            p <- 1 - exp(-r*d*rfac)
-            Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
-            if(ploidy == 2) {
-                Pi[,"par1/par1","par1/par1"] <- Pi[,"par1/par2","par1/par2"] <- Pi[,"par2/par2","par2/par2"] <- 1-p
-                Pi[,"par1/par1","par1/par2"] <- Pi[,"par1/par2","par1/par1"] <- Pi[,"par1/par2","par2/par2"] <- Pi[,"par2/par2","par1/par2"] <- p
-                Pi[,"par1/par1","par2/par2"] <- Pi[,"par2/par2","par1/par1"] <- 0
-            } else {
-                Pi[,"par1","par1"] <- Pi[,"par2","par2"] <- 1-p
-                Pi[,"par1","par2"] <- Pi[,"par2","par1"] <- p
-            }
-            Pi[1,,] <- NA
-            
+           	d <- c(NA, diff(data$pos))
+	      	if(HMMtype == "ML"){
+	            p <- 1 - exp(-r*d*rfac)
+           	   	Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
+	            if(ploidy == 2) {
+	                Pi[,"par1/par1","par1/par1"] <- Pi[,"par1/par2","par1/par2"] <- Pi[,"par2/par2","par2/par2"] <- 1-p
+	                Pi[,"par1/par1","par1/par2"] <- Pi[,"par1/par2","par1/par1"] <- Pi[,"par1/par2","par2/par2"] <- Pi[,"par2/par2","par1/par2"] <- p
+	                Pi[,"par1/par1","par2/par2"] <- Pi[,"par2/par2","par1/par1"] <- 0
+	            } else {
+	                Pi[,"par1","par1"] <- Pi[,"par2","par2"] <- 1-p
+	                Pi[,"par1","par2"] <- Pi[,"par2","par1"] <- p
+	            }
+	            Pi[1,,] <- NA
+	            }
+	            
             ## Allele frequencies in parental backgrounds
             ppar1 <- ppar2 <- matrix(NA, nrow=4, ncol=4, dimnames=list(alleles, alleles))
             ppar1[] <- deltapar1/3
@@ -202,13 +216,48 @@ for(indiv in indivs) {
             data <- cbind(data, prob)
             data$est <- apply(prob, 1, which.max)
             
+
             ## Posterior probability
-            hmm <- forwardback.ded(Pi=Pi, delta=phi, prob=prob)
-            #hmm <- forwardback.ded(Pi=Pi, delta=rep(1/K, K), prob=prob)
-            Pr.z.given.y <- exp(hmm$logalpha + hmm$logbeta - hmm$LL)
-            colnames(Pr.z.given.y) <- paste("Pr(", ancestries, "|y)")
-            data <- cbind(data, Pr.z.given.y)
-            attr(data, "badpos") <- badpos
+            
+            if(HMMtype == "ML"){
+	            hmm <- forwardback.ded(Pi=Pi, delta=phi, prob=prob)
+	            #hmm <- forwardback.ded(Pi=Pi, delta=rep(1/K, K), prob=prob)
+	            Pr.z.given.y <- exp(hmm$logalpha + hmm$logbeta - hmm$LL)
+	            }
+			if(HMMtype == "viterbi"){
+				
+				if(ploidy == 2){zero <- matrix(c(1,6,3,4), ncol=2, byrow = TRUE)}
+				if(ploidy == 1){zero <- NULL}
+				
+				#Int could be replaced by a vector to add interference, but its vestigial as is.
+				Int <- 1
+				if(length(prob[,1]) > 1){
+					#Run Viterbi-HMM forward and backwards and output the state sequence
+					dual.hmm <- new.HMM_pathFR(phi, d, prob, zero, HMM_decay, r, Int)
+					datapos <- data$pos
+						
+					#Compare recombination events called by foward and reverse HMM runs and determine a consensus, likely set of recombinations
+					conc.hap <- new.HMM_path.consensus(dual.hmm, contig, K, data$pos)
+					
+					Pr.z.given.y <- t(sapply(1:L, function(x){ifelse(1:K == conc.hap$Ancestry[x], 1, 0)}))
+					
+					if(length(unique(conc.hap$Ancestry)) != 1){	
+					#gradient based on ambiguous breakpoint boundaries
+			
+						for(recon in 1:length(conc.hap$recoZ[,1])){
+							reco <- conc.hap$recoZ[recon,]
+							interpol_p <- 1 - (datapos[reco$mark_start:reco$mark_end] - datapos[reco$mark_start])/(datapos[reco$mark_end] - datapos[reco$mark_start])
+							
+							Pr.z.given.y[reco$mark_start:reco$mark_end,reco$starthap] <- interpol_p
+							Pr.z.given.y[reco$mark_start:reco$mark_end,reco$endhap] <- 1-interpol_p
+							}
+						}
+					}
+				}
+				
+			colnames(Pr.z.given.y) <- paste("Pr(", ancestries, "|y)")
+			data <- cbind(data, Pr.z.given.y)
+			attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
         
         }
@@ -216,7 +265,6 @@ for(indiv in indivs) {
         save(dataa, file=hmmdata.file)
         cat("OK\n")
     }
-    
     
     contigLengths <- contigLengths[plot.contigs,]
 
