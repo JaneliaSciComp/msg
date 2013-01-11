@@ -4,7 +4,11 @@ https://github.com/JaneliaSciComp/msg
 http://www.ncbi.nlm.nih.gov/pubmed/21233398
 
 ### Dependencies ###
-  Run test_dependencies.sh to check for the existence of dependencies
+Run test_dependencies.sh to check for the existence of dependencies
+
+NOTE: Most of these packages can be found in the dependencies directory for you to 
+extract and install as needed on your system.
+
 Python (2.6.4)
 bwa (0.5.7)
 samtools (0.1.9-3)  ! Newer versions of Samtools will not work !

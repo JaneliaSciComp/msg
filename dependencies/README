@@ -1,0 +1,23 @@
+This directory contains the installers for most of the MSG dependencies.  (See ../README for a full listing).
+
+Extract, and follow the specific install instructions for any of these dependencies you might need.
+
+(Some of these are specific to 64bit Linux.  If you're on a different system you may have some work to do.)
+
+
+As of mid-2012 these dependencies could be downloaded from these URLs:
+(This list is intended to be a helpful starting point if you need something beyond what is included in this directory.)
+http://lib.stat.cmu.edu/R/CRAN/src/contrib/Archive/R.oo/
+http://lib.stat.cmu.edu/R/CRAN/src/contrib/Archive/R.methodsS3/
+http://lib.stat.cmu.edu/R/CRAN/src/contrib/Archive/zoo/
+http://lib.stat.cmu.edu/R/CRAN/src/contrib/Archive/HiddenMarkov/
+http://lib.stat.cmu.edu/R/CRAN/
+http://code.google.com/p/pysam/downloads/detail?name=pysam-0.1.2.tar.gz&can=2&q=
+http://www.cosc.canterbury.ac.nz/greg.ewing/python/Pyrex/
+http://www.biopython.org/wiki/Download
+http://sourceforge.net/projects/samtools/files/samtools/0.1.9/samtools-0.1.9.tar.bz2/download
+http://sourceforge.net/projects/samtools/files/samtools/0.1.9/
+http://sourceforge.net/projects/bio-bwa/files/
+http://code.google.com/p/pysam/source/checkout
+http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0
+
