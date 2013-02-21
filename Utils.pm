@@ -82,6 +82,9 @@ sub validate_config {
         if (exists $params->{$param}) {
             die "Exiting from msgCluster: Missing file $params->{$param}.\n" unless (-e $params->{$param});
         }
+        else {
+            die "Parameter $param is required in the config file.\n";
+        }
     }
     print "\nParameters:\n\n";
     ### double check if the minimum exist

@@ -8,8 +8,9 @@ $" = "\n";
 my $msg_src = dirname $0 ;
 my $verbose = 0;
 
-# updated Greg Pinero April 2012
+# updated Greg Pinero 2012/2013
 # - added Tn5-IonTorrent
+# - added IonTorrent-12N
 
 # version 10 (02.25.10)
 # - added more restriction enzymes
@@ -124,6 +125,8 @@ my $seq_start = $BC_length;
 #   barcode 19bp-transposon-end the-seqn-we-want  reverse-complement-of-linker-P1
 #   i.e barcode barcode_addon  NO OVERHANG! FC1_linker_seq
 #   NNNNNN AGATGTGTATAAGAGACAG some seq CTGTCTCTTATACACATCTATCACCGACTGCCCATAGAGAGGAAAGCGGAGGCGTAGTGG
+# IonTorrent-12N    NNNNNN NNNNNNNNNNNN some_seq 
+#   barcode 12bp-fully-degenerate_seqn the-seqn-we-want
 
 ### FC1_overhang === overhang selected for RE cut site
 ### overhang === overhang that gets sequenced (dependent on blunt ligation)
@@ -141,6 +144,8 @@ switch ($linker_type) {
 	case 'ButtFinch_PE_vII_ANA'	{	$barcode_addon = '';  $FC1_overhang = 'T';  $overhang = '';	  $FC1_linker_seq =   'TCGGAAGAGCGGTTCAGCAGGAATGCCGAG'; } # GA became part of barcode
 	case 'Tn5-IonTorrent'	{		$barcode_addon = 'AGATGTGTATAAGAGACAG';  $FC1_overhang = '';  $overhang = ''; 
 	    $FC1_linker_seq = 'CTGTCTCTTATACACATCTATCACCGACTGCCCATAGAGAGGAAAGCGGAGGCGTAGTGG'; }
+	case 'IonTorrent-12N'	{		$barcode_addon = 'NNNNNNNNNNNN';  $FC1_overhang = '';  $overhang = ''; 
+	    $FC1_linker_seq = ''; }
 	else							{			die "ERROR: Unknown linker_type: $linker_type\n"; }
 }  
 

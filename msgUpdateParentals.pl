@@ -13,10 +13,6 @@ printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$s
 ### Default parameters
 ### All of these parameters are required
 my %default_params = (
-        parent1        => 'NULL',
-        parent2        => 'NULL',
-        parent1_reads  => 'NULL',
-        parent2_reads  => 'NULL',
         bwaindex1      => 'bwtsw',
         bwaindex2      => 'bwtsw',
         cluster        => '1',
@@ -40,7 +36,18 @@ my %default_params = (
     );
 
 my $params = Utils::parse_config('update.cfg', \%default_params);
-Utils::validate_config($params, qw( parent1 parent2 parent1_reads parent2_reads));
+
+# Validation of Required parameters 
+if (!((exists $params->{'parent1'} && exists $params->{'parent1_reads'}) || (exists $params->{'parent2'} && exists $params->{'parent2_reads'}))) {
+    die "Missing Parameters: parent1 and parent1_reads and/or parent2 and parent2_reads";
+}
+if (exists $params->{'parent1'}) {
+    Utils::validate_config($params, qw( parent1 parent1_reads));
+}
+if (exists $params->{'parent2'}) {
+    Utils::validate_config($params, qw( parent2 parent2_reads));
+}
+
 my %params = %$params;
 
 ####################################################################################################
