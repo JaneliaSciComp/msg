@@ -264,6 +264,47 @@ for(indiv in indivs) {
             byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95);
             if (is.null(byBlocks[["bps"]])==F) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
 
+            ### Output a gff file for geneious
+            geneious_data <- {};
+            #Calculate confidence thresholds
+            gff_thresh <- .95; #!!TODO: make into parameter
+            gff_thresh_inverse = 1-gff_thresh; #e.g., .05
+            #Get breakpoints using both confidence thresholds
+            gff_data <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, 
+                contig=contig, conf1=gff_thresh ,conf2=gff_thresh);
+            gff_data_inverse <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], 
+                indiv=indiv, contig=contig, conf1=gff_thresh_inverse ,conf2=gff_thresh_inverse);
+            #If we got any breakpoints, collect them in geneious_data
+            #Data we get will have columns: x[end_index]-x[start_index]+1,indiv,contig,start_index,end_index,x[start_index],x[end_index],endpoints
+            #looks like:
+            #$blocks
+            #   V1       V2              V3 V4  V5  V6      V7       V8
+            #1 homozygous_par2 13707087 indivH12_TTGACG 2R 181 548 5855429 19562515
+            #$bps
+            #   V1              V2 V3  V4  V5      V6      V7               V8     V9
+            #1 60682 indivH12_TTGACG 2R 180 181 5794748 5855429 5804668.36093989   5804668.36093989
+            if (is.null(gff_data[["bps"]])==F) { geneious_data <- rbind(geneious_data,gff_data[["bps"]]); }
+            if (is.null(gff_data_inverse[["bps"]])==F) { geneious_data <- rbind(geneious_data,gff_data_inverse[["bps"]]); }
+            #Write out geneious_data to file in gff version 3 format (if there were any breakpoints found)
+            #Testing:
+            #Rscript msg/fit-hmm.R -d hmm_data -i indivH12_TTGACG -s male -o hmm_fit -p 0.01 -q 0.01 -r .000001 -c all -x X -y all -z 0.25,0.5,0.25 -t 1
+            if (is.null(geneious_data)==F) {
+                #Create a data frame with the following columns:
+                #See http://www.sequenceontology.org/gff3.shtml
+                geneious_data <- geneious_data[6:7]; #Keep only bps columns (We want 6:7, 4:5 are markers?)
+                geneious_data <- cbind(geneious_data, rep("Geneious", nrow(geneious_data))); #seqid
+                geneious_data <- cbind(geneious_data, rep("msg_run", nrow(geneious_data))); #source
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #type
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #score
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #strand
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #phase
+                geneious_data <- cbind(geneious_data, rep(paste("name",indiv, sep="="), nrow(geneious_data))); #attributes
+                # Reorder columns to match geneious format
+                reordered_df <- geneious_data[c(3,4, 5, 1, 2, 6, 7, 8, 9)];
+                write.table(reordered_df,file=file.path(outdir, indiv, paste(indiv, contig, "breakpoints.gff", sep="-")),
+                    append=F,quote=F,na="NA",row.names=F,col.names=F,sep="\t");
+            }
+
 				### plot
             like.par1 <- contig_data[contig_data$read_allele==contig_data$par1ref,]$pos;
             like.par2 <- contig_data[contig_data$read_allele==contig_data$par2ref,]$pos;
