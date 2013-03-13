@@ -290,14 +290,15 @@ for(indiv in indivs) {
             #Rscript msg/fit-hmm.R -d hmm_data -i indivH12_TTGACG -s male -o hmm_fit -p 0.01 -q 0.01 -r .000001 -c all -x X -y all -z 0.25,0.5,0.25 -t 1
             if (is.null(geneious_data)==F) {
                 #Create a data frame with the following columns:
-                #See http://www.sequenceontology.org/gff3.shtml
+                #blank, "Geneious", run name, start, end, dot, dot, dot, attributes
+                #(I'm not sure what version of gff this is but it matches what David is using)
                 geneious_data <- geneious_data[6:7]; #Keep only bps columns (We want 6:7, 4:5 are markers?)
+                geneious_data <- cbind(geneious_data, rep("", nrow(geneious_data))); #empty column to start
                 geneious_data <- cbind(geneious_data, rep("Geneious", nrow(geneious_data))); #seqid
                 geneious_data <- cbind(geneious_data, rep("msg_run", nrow(geneious_data))); #source
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #type
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #score
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #strand
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #phase
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
+                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
                 geneious_data <- cbind(geneious_data, rep(paste("name",indiv, sep="="), nrow(geneious_data))); #attributes
                 # Reorder columns to match geneious format
                 reordered_df <- geneious_data[c(3,4, 5, 1, 2, 6, 7, 8, 9)];
