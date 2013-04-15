@@ -257,55 +257,125 @@ for(indiv in indivs) {
 
         if (sum(names(dataa) %in% contig)!=0) {
             contig_data <- dataa[[contig]];
-            x <- contig_data$pos
+            x <- contig_data$pos #a list of positions
             y <- contig_data[,paste("Pr(", ancestries, "|y)")]
-	
+	        
 				### divvy up homozygous and heterozygous blocks
             byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95);
             if (is.null(byBlocks[["bps"]])==F) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
 
             ### Output a gff file for geneious
-            geneious_data <- {};
+            #Testing on toy data:
+            #Rscript msg/fit-hmm.R -d hmm_data -i indivH12_TTGACG -s male -o hmm_fit -p 0.01 -q 0.01 -r .000001 -c all -x X -y all -z 0.25,0.5,0.25 -t 1
+            #Or rerunnable:
+            #rm hmm_fit/indiv7_ACTGAC/*.csv hmm_fit/indiv7_ACTGAC/*.pdf hmm_fit/indiv7_ACTGAC/*.RData;Rscript msg/fit-hmm.R -d hmm_data -i indiv7_ACTGAC -s female -o hmm_fit -p .01 -q .01 -r .000001 -c 2,3,4,X -x X -y 2,3,4,X -z 0.5,0,0.5 -t 1
             #Calculate confidence thresholds
+            
+#Working here, make threshold come from msg.cfg/command line, also needs more testing, and maybe break out gff stuff to function, 
+#and comment out prints            
+            
             gff_thresh <- .95; #!!TODO: make into parameter
             gff_thresh_inverse = 1-gff_thresh; #e.g., .05
             #Get breakpoints using both confidence thresholds
             gff_data <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, 
-                contig=contig, conf1=gff_thresh ,conf2=gff_thresh);
-            gff_data_inverse <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], 
-                indiv=indiv, contig=contig, conf1=gff_thresh_inverse ,conf2=gff_thresh_inverse);
-            #If we got any breakpoints, collect them in geneious_data
-            #Data we get will have columns: x[end_index]-x[start_index]+1,indiv,contig,start_index,end_index,x[start_index],x[end_index],endpoints
-            #looks like:
+                contig=contig, conf1=gff_thresh_inverse ,conf2=gff_thresh);
+            #Data in bps section will have columns: x[end_index]-x[start_index]+1,indiv,contig,start_index,end_index,x[start_index],x[end_index],endpoints
+            #will look like:
             #$blocks
             #   V1       V2              V3 V4  V5  V6      V7       V8
             #1 homozygous_par2 13707087 indivH12_TTGACG 2R 181 548 5855429 19562515
             #$bps
             #   V1              V2 V3  V4  V5      V6      V7               V8     V9
-            #1 60682 indivH12_TTGACG 2R 180 181 5794748 5855429 5804668.36093989   5804668.36093989
-            if (is.null(gff_data[["bps"]])==F) { geneious_data <- rbind(geneious_data,gff_data[["bps"]]); }
-            if (is.null(gff_data_inverse[["bps"]])==F) { geneious_data <- rbind(geneious_data,gff_data_inverse[["bps"]]); }
-            #Write out geneious_data to file in gff version 3 format (if there were any breakpoints found)
-            #Testing:
-            #Rscript msg/fit-hmm.R -d hmm_data -i indivH12_TTGACG -s male -o hmm_fit -p 0.01 -q 0.01 -r .000001 -c all -x X -y all -z 0.25,0.5,0.25 -t 1
-            if (is.null(geneious_data)==F) {
-                #Create a data frame with the following columns:
-                #blank, "Geneious", run name, start, end, dot, dot, dot, attributes
-                #(I'm not sure what version of gff this is but it matches what David is using)
-                geneious_data <- geneious_data[6:7]; #Keep only bps columns (We want 6:7, 4:5 are markers?)
-                geneious_data <- cbind(geneious_data, rep("", nrow(geneious_data))); #empty column to start
-                geneious_data <- cbind(geneious_data, rep("Geneious", nrow(geneious_data))); #seqid
-                geneious_data <- cbind(geneious_data, rep("msg_run", nrow(geneious_data))); #source
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
-                geneious_data <- cbind(geneious_data, rep(".", nrow(geneious_data))); #
-                geneious_data <- cbind(geneious_data, rep(paste("name",indiv, sep="="), nrow(geneious_data))); #attributes
-                # Reorder columns to match geneious format
-                reordered_df <- geneious_data[c(3,4, 5, 1, 2, 6, 7, 8, 9)];
-                write.table(reordered_df,file=file.path(outdir, indiv, paste(indiv, contig, "breakpoints.gff", sep="-")),
+            #1 60682 indivH12_TTGACG 2R 180 181 5794748 5855429 5804668.36093989   5804668.36093989            
+            
+            print(gff_data);
+
+            if (is.null(gff_data[["bps"]])==F) {
+                gff_for_output <- {}; #collect all rows to write into gff file
+            
+                #initiate variables to track the inner and outer start and end points of each breakpoint
+                start_inner <- NULL;
+                start_outer <- NULL;
+                end_inner <- NULL;
+                end_outer <- NULL;
+
+                #Look at conf at first site or position, If high we start first introgression at 1, otherwise start at first breakpoint
+                if (y[1,par1homo_col] > .5) {
+                    start_inner <- 1;
+                    start_outer <- 1;
+                }
+                print("Starting Loop, there are number rows:");                
+                print(nrow(gff_data[["bps"]]));
+                print("bps data");
+                print(gff_data[["bps"]]);
+                #Loop through breakpoints and write to gff file: 2 lines per breakpoint, one for inner range and one for outer.
+                
+                for(i in 1:nrow(gff_data[["bps"]])) {
+                    row <- gff_data[["bps"]][i,];
+                    print("i is");
+                    print(i);
+                    print("row is");
+                    print(row);
+                    
+                    if (is.null(start_inner)==F && is.null(start_outer)==F) {
+                        #If start points are set, use this row as end points
+                        stopifnot(is.null(end_inner)==T);
+                        stopifnot(is.null(end_outer)==T);
+                        end_inner <- as.numeric(as.character(row[1,6]));
+                        end_outer <- as.numeric(as.character(row[1,7]));
+                        print("recording end points:");
+                        print(end_inner);
+                        print(end_outer);
+                    }
+                    else {
+                        #If start points are not set, use this row as start points
+                        stopifnot(is.null(start_inner)==T);
+                        stopifnot(is.null(start_outer)==T);
+                        start_inner <- as.numeric(as.character(row[1,7]));
+                        start_outer <- as.numeric(as.character(row[1,6]));
+                        print("recording start points:");
+                        print(start_inner);
+                        print(start_outer);
+                    }
+                    #Write out gff lines once we have inner and outer points
+                    if (is.null(start_inner)==F && is.null(end_inner)==F) {
+                        gff_for_output <- rbind(gff_for_output, 
+                            c("", "Geneious", "msg_run", start_inner, end_inner, ".", ".", ".", paste("name",indiv, sep="=")));
+                        start_inner <- NULL;
+                        end_inner <- NULL;
+                        print("writing inner");
+                        print("output obj state:");
+                        print(gff_for_output);
+                    }
+                    if (is.null(start_outer)==F && is.null(end_outer)==F) {
+                        gff_for_output <- rbind(gff_for_output, 
+                            c("", "Geneious", "msg_run", start_outer, end_outer, ".", ".", ".", paste("name",indiv, sep="=")));
+                        start_outer <- NULL;
+                        end_outer <- NULL;
+                        print("writing outer");
+                        print("output obj state:");
+                        print(gff_for_output);                        
+                    }
+                }
+                #Handle case where last endpoint wasn't found, use end of chrom
+                if (is.null(start_inner)==F && is.null(start_outer)==F) {
+                    stopifnot(is.null(end_inner)==T);
+                    stopifnot(is.null(end_outer)==T);
+                    end_inner <- contigLengths[contigLengths$chr == contig,"length"]; #end of chrom
+                    end_outer <- contigLengths[contigLengths$chr == contig,"length"]; #end of chrom
+                    gff_for_output <- rbind(gff_for_output, 
+                        c("", "Geneious", "msg_run", start_inner, end_inner, ".", ".", ".", paste("name",indiv, sep="=")));
+                    gff_for_output <- rbind(gff_for_output, 
+                        c("", "Geneious", "msg_run", start_outer, end_outer, ".", ".", ".", paste("name",indiv, sep="=")));    
+                    print("writing final inner and outer");
+                    print("output obj state:");
+                    print(gff_for_output);                                 
+                }
+                #Write out
+                write.table(gff_for_output,file=file.path(outdir, indiv, paste(indiv, contig, "breakpoints.gff", sep="-")),
                     append=F,quote=F,na="NA",row.names=F,col.names=F,sep="\t");
             }
-
+                
 				### plot
             like.par1 <- contig_data[contig_data$read_allele==contig_data$par1ref,]$pos;
             like.par2 <- contig_data[contig_data$read_allele==contig_data$par2ref,]$pos;
