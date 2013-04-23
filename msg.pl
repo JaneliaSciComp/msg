@@ -54,6 +54,7 @@ GetOptions(
     'index_file=s' => \$index_file,
     'index_barcodes=s' => \$index_barcodes,
     'debug=i' => \$debug,
+    'gff_thresh_conf=s' => \$gff_thresh_conf,
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -93,6 +94,7 @@ print "parent_mapq_filter $parent_mapq_filter\n\n";
 print "index_file $index_file\n\n";
 print "index_barcodes $index_barcodes\n\n";
 print "debug $debug\n\n";
+print "gff_thresh_conf $gff_thresh_conf\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -407,7 +409,8 @@ if ($parse_or_map eq '--map-only') {
    			 '-z', $priors,
    			 '-t', $theta,
              '-w', $bwa_alg,
-             '-e', $use_stampy
+             '-e', $use_stampy,
+             '-m', $gff_thresh_conf,
    		  ) ;
 
    } close BARCODE;

@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:r:t:h:w:e:" opt
+while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:r:t:h:w:e:m:" opt
 do 
   case $opt in
       b) barcodes=$OPTARG ;;
@@ -32,6 +32,7 @@ do
       t) theta=$OPTARG ;;
       w) bwaalg=$OPTARG ;;
       e) usestampy=$OPTARG ;;
+      m) gff_thresh_conf=$OPTARG ;;
       *) usage ;;
   esac
 done
@@ -86,7 +87,7 @@ $cmd || {
 echo "Fitting HMM for $indiv"
 Rindivdir=$Routdir/$indiv
 [ -d $Rindivdir ] || mkdir -p $Rindivdir
-cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta"
+cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta -g $gff_thresh_conf"
 
 exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
 echo $cmd

@@ -51,6 +51,7 @@ my %default_params = (
         email_host => '',
         notify_emails => '',
         debug => '0',
+        gff_thresh_conf => '.95',
     );
 
 my $params = Utils::parse_config('msg.cfg', \%default_params);
@@ -155,6 +156,7 @@ if ($params{'cluster'} != 0) {
         ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
         ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
         ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
+        ' --gff_thresh_conf ' . $params{'gff_thresh_conf'} .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
@@ -180,6 +182,7 @@ if ($params{'cluster'} != 0) {
         ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
         ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
         ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
+        ' --gff_thresh_conf ' . $params{'gff_thresh_conf'} .
        "\n";
     }
 close OUT;
