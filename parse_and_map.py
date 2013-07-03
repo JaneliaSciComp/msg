@@ -105,6 +105,9 @@ class ParseAndMap(CommandLineApp):
 
         op.add_option('--new_parser', dest='new_parser', type='int', default=0, 
                       help='Use a faster, experimental parser')
+
+        op.add_option('--new_parser_offset', dest='new_parser_offset', type='int', default=0, 
+                      help='When using new parser, how many base pairs after barcode to omit')
                 
         #Illumina indexing only
         op.add_option('--index_file', dest='index_file', type='string', default=None, 
@@ -305,7 +308,9 @@ class ParseAndMap(CommandLineApp):
         
         print "Parsing data (%s) into individual barcode files" % raw_data    
         if self.options.new_parser:
-            args = ["python", os.path.join(os.path.dirname(__file__), "grepfqparser.py"),
+            args = ["python", 
+                os.path.join(os.path.dirname(__file__), "grepfqparser.py"),
+                "-t", str(self.options.new_parser_offset), 
                 raw_data, self.options.barcodes_file, raw_data + '_parsed/']
             print ' '.join(args)
             sys.stdout.flush()

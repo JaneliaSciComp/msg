@@ -53,6 +53,7 @@ my %default_params = (
         debug => '0',
         gff_thresh_conf => '.95',
         new_parser => '0',
+        new_parser_offset => '0',
     );
 
 my $params = Utils::parse_config('msg.cfg', \%default_params);
@@ -97,6 +98,7 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
     ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
     ' --new_parser ' . $params{'new_parser'} .
+    ' --new_parser_offset ' . $params{'new_parser_offset'} .
     " --parse_or_map parse-only";
 if ($params{'index_file'} && $params{'index_barcodes'}) {
     print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
