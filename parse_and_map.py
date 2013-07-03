@@ -102,6 +102,9 @@ class ParseAndMap(CommandLineApp):
                       
         op.add_option('--indiv_mapq_filter', dest='mapq_filter', type='int', default=0, 
                       help='Filter out poor alignments.  Set this to 0 to skip.')
+
+        op.add_option('--new_parser', dest='new_parser', type='int', default=0, 
+                      help='Use a faster, experimental parser')
                 
         #Illumina indexing only
         op.add_option('--index_file', dest='index_file', type='string', default=None, 
@@ -298,44 +301,52 @@ class ParseAndMap(CommandLineApp):
                 os.remove("./" + fastq_file)
 
         raw_data = use_raw_data_file or self.options.raw_data_file
-    
-        print "Parsing data (%s) into individual barcode files" % raw_data
-        args = ["perl", os.path.join(os.path.dirname(__file__), "parse_BCdata2BWA.pl"), 
-                  '-b', self.options.barcodes_file,
-                  '-e', self.options.re_cutter,
-                  '-l', self.options.linker_system,
-                  raw_data ]
-
-        print ' '.join(args)
-        sys.stdout.flush()
-        subprocess.call(args) 
-
-        # Outputs separate file for each individual with barcode and identifier in filename
-        # "indiv#_barcode"
-    
-        #print file with statistics of parsing
         stats_file = open(raw_data+'_stats.txt','w')
-        total_reads = 0
-        read_file = './'+raw_data+'_parsed/bad_barcodes'
-        number_reads = count_lines(read_file)/4
-        stats_file.write('bad_barcodes\t%s\n' %(number_reads))
-        total_reads += number_reads
+        
+        print "Parsing data (%s) into individual barcode files" % raw_data    
+        if self.options.new_parser:
+            args = ["python", os.path.join(os.path.dirname(__file__), "grepfqparser.py"),
+                raw_data, self.options.barcodes_file, raw_data + '_parsed/']
+            print ' '.join(args)
+            sys.stdout.flush()
+            subprocess.check_call(args)
+        else:
+            args = ["perl", os.path.join(os.path.dirname(__file__), "parse_BCdata2BWA.pl"), 
+                      '-b', self.options.barcodes_file,
+                      '-e', self.options.re_cutter,
+                      '-l', self.options.linker_system,
+                      raw_data ]
     
-        read_file = './'+raw_data+'_parsed/unreadable_barcodes'
-        number_reads = count_lines(read_file)/4
-        stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
-        total_reads += number_reads
-    
-        read_file = './'+raw_data+'_parsed/linkers'
-        number_reads = count_lines(read_file)/2
-        stats_file.write('linkers\t%s\n' %(number_reads))   
-        total_reads += number_reads
-    
-        read_file = './'+raw_data+'_parsed/junk'
-        number_reads = count_lines(read_file)/4
-        stats_file.write('junk\t%s\n' %(number_reads))   
-        total_reads += number_reads
+            print ' '.join(args)
+            sys.stdout.flush()
+            subprocess.call(args) 
 
+            # Outputs separate file for each individual with barcode and identifier in filename
+            # "indiv#_barcode"
+        
+            #print file with statistics of parsing
+            total_reads = 0
+            read_file = './'+raw_data+'_parsed/bad_barcodes'
+            number_reads = count_lines(read_file)/4
+            stats_file.write('bad_barcodes\t%s\n' %(number_reads))
+            total_reads += number_reads
+        
+            read_file = './'+raw_data+'_parsed/unreadable_barcodes'
+            number_reads = count_lines(read_file)/4
+            stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
+            total_reads += number_reads
+        
+            read_file = './'+raw_data+'_parsed/linkers'
+            number_reads = count_lines(read_file)/2
+            stats_file.write('linkers\t%s\n' %(number_reads))   
+            total_reads += number_reads
+        
+            read_file = './'+raw_data+'_parsed/junk'
+            number_reads = count_lines(read_file)/4
+            stats_file.write('junk\t%s\n' %(number_reads))   
+            total_reads += number_reads
+
+        total_reads = 0
         for ind in self.bc:
             file_name = 'indiv' + ind[1] + '_' + ind[0]
             fastq_file = raw_data + '_parsed/' + file_name

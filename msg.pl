@@ -55,6 +55,7 @@ GetOptions(
     'index_barcodes=s' => \$index_barcodes,
     'debug=i' => \$debug,
     'gff_thresh_conf=s' => \$gff_thresh_conf,
+    'new_parser=i' => \$new_parser,
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -95,6 +96,7 @@ print "index_file $index_file\n\n";
 print "index_barcodes $index_barcodes\n\n";
 print "debug $debug\n\n";
 print "gff_thresh_conf $gff_thresh_conf\n\n";
+print "new_parser $new_parser\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -371,7 +373,8 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
         '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
         '--indiv_mapq_filter', $indiv_mapq_filter, '--index_file', $index_file,
         '--index_barcodes', $index_barcodes, '--quality_trim_reads_thresh', $quality_trim_reads_thresh || '0',
-        '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug
+        '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug,
+        '--new_parser', $new_parser || '0'
         ) ;
 
 ## Strip species out of reference column
