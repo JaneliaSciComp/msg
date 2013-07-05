@@ -60,7 +60,7 @@ def main():
                         print __doc__
                         sys.exit(0)
         if len(arg) < 3:
-                print "\nUsage: python grepfqparser.py <input_fastq> <barcode_file> <output_folder>\m"                
+                print "\nUsage: python grepfqparser.py [options] <input_fastq> <barcode_file> <output_folder>\m"                
                 sys.exit(0)
         #process arguments
         fqFile = arg[0]
@@ -88,7 +88,7 @@ def main():
         else:
                 gzbool  = "NO"
                 
-        print "fq file gzipped? = %s" %(gzbool)        
+        print "fq file gzipped? = %s" %(gzbool)
         if gzbool == "YES":
                 print "unzipping file"
                 tempfq = open("tempfq",'w')
@@ -106,30 +106,18 @@ def main():
                 barcode_up = barcode.upper()
                 name = lineItems[1]
                 print barcode
-                
-                parsed_file_step1_name = str(OutFolder + "/indiv" + name + "_" + barcode + "firstgrep")
-                parsed_file_step1 = open(parsed_file_step1_name,'w') 
-                errlog = open("errlog2",'w')
-                #(note: pipe into sed to remove barcodes and associated quality scores from each line)
-                cmd = "grep -B 1 -A 2 ^%s %s | sed '2~2s/^%s//g'" % (barcode_up, fqFile, '.'*(len(barcode_up)+offset))
-                failed = subprocess.call(cmd, shell=True,stdout=parsed_file_step1, stderr=errlog)
-                errlog.close()
-                parsed_file_step1.close()
-                if failed:
-                    continue
-                """grep with -B and -A produces spacer marks '--' in file. Cannot figure out how to suppress these, 
-                so remove and paste into new file, then delete original"""
-                
                 parsed_file_name = str(OutFolder + "/indiv" + name + "_" + barcode)
                 parsed_file = open(parsed_file_name,'w')
-                errlog = open("errlog3",'w')
-                cmd = 'awk "!/^--$/" %s' % (parsed_file_step1_name)
-                subprocess.check_call(cmd,shell=True,stdout=parsed_file,stderr=errlog)
-                errlog.close()
-                parsed_file.close()
-                cmd = 'rm %s' % (parsed_file_step1_name)
-                subprocess.check_call(cmd,shell=True)
-        
+                errlog = open("errlog2",'w')
+                #First grep finds lines starting with the barcode and includes the line above, and two lines below each match
+                #Pipe into grep again to filter out -- between matches which some (versions??) of grep insert
+                #Pipe into sed to remove barcodes (optional offset) and associated quality scores from each line
+                cmd = """grep -B 1 -A 2 ^%s %s | grep -v "^--$" | sed '2~2s/^%s//g'""" % (barcode_up, fqFile, '.'*(len(barcode_up)+offset))
+                try:
+                    failed = subprocess.call(cmd, shell=True,stdout=parsed_file, stderr=errlog)
+                finally:
+                    errlog.close()
+                    parsed_file.close()
         bc.close()
   
         """Now collect all unparsed reads"""
