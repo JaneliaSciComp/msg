@@ -16,6 +16,7 @@ __version__ = '0.3.0'
 
 import subprocess
 import sys, os
+import re
 import shutil
 import glob
 import time, datetime
@@ -108,6 +109,9 @@ class ParseAndMap(CommandLineApp):
 
         op.add_option('--new_parser_offset', dest='new_parser_offset', type='int', default=0, 
                       help='When using new parser, how many base pairs after barcode to omit')
+
+        op.add_option('--new_parser_filter_out_seq', dest='new_parser_filter_out_seq', type='string',
+            default=None, help='A sequence to remove from parsed reads')
                 
         #Illumina indexing only
         op.add_option('--index_file', dest='index_file', type='string', default=None, 
@@ -120,6 +124,10 @@ class ParseAndMap(CommandLineApp):
         print bcolors.OKBLUE + 'parse_and_map version %s' % __version__ + bcolors.ENDC
 
         self.start_time = time.time()
+
+        #optparse workaround
+        if self.options.new_parser_filter_out_seq == 'null':
+            self.options.new_parser_filter_out_seq = None
 
         # Get variables from barcode file
         #self.variables, self.bc = read_barcodes(self.options.barcodes_file)
@@ -150,6 +158,8 @@ class ParseAndMap(CommandLineApp):
                 final_paths = self.parse_illumina_indexes()
             else:
                 final_paths = self.parse()
+            if self.options.new_parser and self.options.new_parser_filter_out_seq:
+                self.filter_out_seq_from_files(final_paths)
             self.qual_trim_parsed_files(final_paths)
 
         if self.options.parse_only:
@@ -287,7 +297,46 @@ class ParseAndMap(CommandLineApp):
         log.close()
         
         return final_paths
-
+        
+    def filter_out_from_seq(self, filter_seq, seq, qual):
+        """       
+        >>> ParseAndMap().filter_out_from_seq('GAT', 'ACGATACCGAT', '+-+-+-+-+-+')
+        ('ACACC', '+--+-')
+        >>> ParseAndMap().filter_out_from_seq('GAT', 'ACGATACC', '+-+-+-+-')
+        ('ACACC', '+--+-')
+        >>> ParseAndMap().filter_out_from_seq('GAT', 'GATACGATACC', '+-++-+-+-+-')
+        ('ACACC', '+--+-')
+        >>> ParseAndMap().filter_out_from_seq('TA', 'ACTAGATACC', '+-+-+-+-+-')
+        ('ACGACC', '+-+-+-')
+        """
+        assert len(seq) == len(qual)
+        new_seq = seq.replace(filter_seq,'')
+        new_qual = qual
+        if len(new_seq) != len(seq):
+            new_qual = list(qual)
+            for match in re.finditer(filter_seq, seq):
+                new_qual[match.start():match.end()] = [None] * (match.end() - match.start())
+            new_qual = [q for q in new_qual if q]
+            assert len(new_seq) == len(new_qual)
+            new_qual = ''.join(new_qual)
+        return new_seq, new_qual
+        
+    @trace
+    def filter_out_seq_from_files(self, final_paths):
+        """Filter out a sequence"""
+        for path in final_paths:
+            if path.lower().endswith('.gz'):
+                f, out = gzip.open(path, 'rb'), gzip.open(path + '.temp', 'wb')
+            else:
+                f, out = open(path, 'r'), open(path + '.temp', 'w')
+            for rec in barcode_splitter.read_fastq(f):
+                rec['seq'], rec['qual'] = self.filter_out_from_seq(
+                    self.options.new_parser_filter_out_seq, rec['seq'], rec['qual'])
+                out.write(barcode_splitter.fastq_string(rec))
+            f.close()
+            out.close()
+            shutil.move(path + '.temp', path)
+    
     def parse(self, use_raw_data_file=None):
         
         #store and return the final relative paths of all the parsed individuals' fastq files
@@ -665,6 +714,7 @@ def datetimenow():
     return str(datetime.datetime.now()).split('.')[0].replace(' ', '_').replace(':','.')
 
 if __name__ == '__main__':
+    #import doctest; doctest.testmod(); sys.exit()
     try:
         ParseAndMap().run()
     except Exception, e:

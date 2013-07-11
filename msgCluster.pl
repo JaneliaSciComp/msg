@@ -54,6 +54,7 @@ my %default_params = (
         gff_thresh_conf => '.95',
         new_parser => '0',
         new_parser_offset => '0',
+        new_parser_filter_out_seq => '',
     );
 
 my $params = Utils::parse_config('msg.cfg', \%default_params);
@@ -100,6 +101,10 @@ print OUT "/bin/hostname\n/bin/date\n" .
     ' --new_parser ' . $params{'new_parser'} .
     ' --new_parser_offset ' . $params{'new_parser_offset'} .
     " --parse_or_map parse-only";
+
+if ($params{'new_parser_filter_out_seq'}) {
+    print OUT ' --new_parser_filter_out_seq ' . $params{'new_parser_filter_out_seq'};
+}
 if ($params{'index_file'} && $params{'index_barcodes'}) {
     print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
 }
@@ -200,7 +205,7 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 ### Run jobs!
 
 if ($params{'cluster'} != 0) {
-    &Utils::system_call("qsub -N msgRun1.$$ -cwd -b y -V -sync n ./msgRun1.sh") ; 
+    &Utils::system_call("qsub -N msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun1.sh") ; 
 }
 else {
     &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; 
