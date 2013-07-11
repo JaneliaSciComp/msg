@@ -299,31 +299,31 @@ class ParseAndMap(CommandLineApp):
         return final_paths
         
     def filter_out_from_seq(self, filter_seq, seq, qual):
-        """       
+        """
+        Only return portions of sequence and quality scores up to matching
+        filter_seq.
         >>> ParseAndMap().filter_out_from_seq('GAT', 'ACGATACCGAT', '+-+-+-+-+-+')
-        ('ACACC', '+--+-')
+        ('AC', '+-')
         >>> ParseAndMap().filter_out_from_seq('GAT', 'ACGATACC', '+-+-+-+-')
-        ('ACACC', '+--+-')
+        ('AC', '+-')
         >>> ParseAndMap().filter_out_from_seq('GAT', 'GATACGATACC', '+-++-+-+-+-')
-        ('ACACC', '+--+-')
+        ('', '')
         >>> ParseAndMap().filter_out_from_seq('TA', 'ACTAGATACC', '+-+-+-+-+-')
-        ('ACGACC', '+-+-+-')
+        ('AC', '+-')
         """
         assert len(seq) == len(qual)
-        new_seq = seq.replace(filter_seq,'')
-        new_qual = qual
-        if len(new_seq) != len(seq):
-            new_qual = list(qual)
-            for match in re.finditer(filter_seq, seq):
-                new_qual[match.start():match.end()] = [None] * (match.end() - match.start())
-            new_qual = [q for q in new_qual if q]
+        new_seq, new_qual = seq, qual
+        match = re.search(filter_seq, seq)
+        if match:
+            new_seq = seq[:match.start()]
+            new_qual = qual[:match.start()]
             assert len(new_seq) == len(new_qual)
-            new_qual = ''.join(new_qual)
         return new_seq, new_qual
         
     @trace
     def filter_out_seq_from_files(self, final_paths):
         """Filter out a sequence"""
+        pattern = self.options.new_parser_filter_out_seq
         for path in final_paths:
             if path.lower().endswith('.gz'):
                 f, out = gzip.open(path, 'rb'), gzip.open(path + '.temp', 'wb')
@@ -331,8 +331,10 @@ class ParseAndMap(CommandLineApp):
                 f, out = open(path, 'r'), open(path + '.temp', 'w')
             for rec in barcode_splitter.read_fastq(f):
                 rec['seq'], rec['qual'] = self.filter_out_from_seq(
-                    self.options.new_parser_filter_out_seq, rec['seq'], rec['qual'])
-                out.write(barcode_splitter.fastq_string(rec))
+                    pattern, rec['seq'], rec['qual'])
+                if rec['seq']:
+                    #Don't write out a record if we've filtered the whole read
+                    out.write(barcode_splitter.fastq_string(rec))
             f.close()
             out.close()
             shutil.move(path + '.temp', path)
