@@ -134,6 +134,8 @@ while (<FILE>) { chomp $_;
 
 print "num barcodes is $num_barcodes!\n";
 
+# Note we include some parsing parameters here since the new style parser operates
+# at the begining of msgRun2.
 open (OUT,'>msgRun2.sh');
 
 if ($params{'cluster'} != 0) {
@@ -166,6 +168,12 @@ if ($params{'cluster'} != 0) {
         ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
         ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
         ' --gff_thresh_conf ' . $params{'gff_thresh_conf'} .
+        ' --new_parser ' . $params{'new_parser'} .
+        ' --new_parser_offset ' . $params{'new_parser_offset'} .
+        ' --re_cutter ' . $params{'re_cutter'} .
+        ' --linker_system ' . $params{'linker_system'} .
+        ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
+        ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
@@ -192,6 +200,12 @@ if ($params{'cluster'} != 0) {
         ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'} .
         ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'} .
         ' --gff_thresh_conf ' . $params{'gff_thresh_conf'} .
+        ' --new_parser ' . $params{'new_parser'} .
+        ' --new_parser_offset ' . $params{'new_parser_offset'} .
+        ' --re_cutter ' . $params{'re_cutter'} .
+        ' --linker_system ' . $params{'linker_system'} .
+        ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
+        ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
        "\n";
     }
 close OUT;

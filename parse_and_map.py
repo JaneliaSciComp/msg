@@ -150,18 +150,25 @@ class ParseAndMap(CommandLineApp):
 
         self.parsed_time = time.time()
         if self.options.map_only:
-            print bcolors.WARN + 'Refusing to parse raw reads: --map-only option is in effect' + bcolors.ENDC
-        elif os.path.exists(self.parsedir):
-            print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC
-        else:
-            if self.options.index_file and self.options.index_barcodes:
-                final_paths = self.parse_illumina_indexes()
+            #Parsing should happen here when user has selected the new parser, this should happen before any mapping
+            if self.options.new_parser:
+                self.parse_all()
             else:
-                final_paths = self.parse()
-            if self.options.new_parser and self.options.new_parser_filter_out_seq:
-                self.filter_out_seq_from_files(final_paths)
-            self.qual_trim_parsed_files(final_paths)
-
+                print bcolors.WARN + 'Refusing to parse raw reads: --map-only option is in effect' + bcolors.ENDC
+        else:
+            if self.options.new_parser:
+                print bcolors.WARN + 'Parsing skipped, will parse at begining of mapping step' + bcolors.ENDC
+                #Skip parsing since it will happen in map step but go ahead and create directory to avoid race
+                #conditions
+                if not os.path.exists(self.parsedir):
+                    print "Created parsedir %s" % self.parsedir
+                    os.mkdir(self.parsedir)
+            else:
+                if os.path.exists(self.parsedir):
+                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC            
+                else:
+                    self.parse_all()
+        
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
 #        elif os.path.exists(self.samdir):
@@ -171,6 +178,16 @@ class ParseAndMap(CommandLineApp):
             if self.options.bwa_alg == 'aln':
                 #bwasw and stampy don't make sai files    
                 self.delete_files()
+
+    def parse_all(self):
+        """Main parsing function"""
+        if self.options.index_file and self.options.index_barcodes:
+            final_paths = self.parse_illumina_indexes()
+        else:
+            final_paths = self.parse()
+        if self.options.new_parser and self.options.new_parser_filter_out_seq:
+            self.filter_out_seq_from_files(final_paths)
+        self.qual_trim_parsed_files(final_paths)        
 
     def qual_trim_parsed_files(self, final_paths):
         """Optionally quality trim the files.
@@ -533,7 +550,7 @@ class ParseAndMap(CommandLineApp):
             #But wait, maybe the parsed fastq file was gzipped so try if it it doesn't exist.
             if not os.path.exists(fastq_file):
                 fastq_file += '.gz'
-                assert os.path.exists(fastq_file),"File %s could not be found.  Something has gone wrong." % fileq_file
+                assert os.path.exists(fastq_file),"File %s could not be found.  Something has gone wrong." % fastq_file
 
             #Change format for sim - output sam file
             aln_par1_sam = './' + raw_data + '_sam_files/aln_' + fastq_file_name + "_" + par1 + ".sam"
