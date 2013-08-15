@@ -39,10 +39,16 @@ Janelia Farm Research Campus
 
 
 import os,sys
+import re
 import getopt
 import subprocess
+import uuid
 
 def main():
+        """Perform the parsing.  
+        Note that this will normally be running in parallel so 
+        for any generically named files we write out, we append the first barcode 
+        (or a uuid) to them."""
         #parse command line options
         try:
                 opts, arg = getopt.getopt(sys.argv[1:],"ht:", ["help"])
@@ -82,6 +88,10 @@ def main():
         print "barcode file = %s" %(bcFile)
         print "Folder of parsed sequences = %s" %(OutFolder)
         
+        #get a unique id to append to file names to avoid overwriting
+        #files from other parellel processes.
+        uid = str(uuid.uuid1())
+        
         y = fqFile.split('.')
         if y[-1] == 'gz':
                 gzbool  = "YES"
@@ -91,24 +101,28 @@ def main():
         print "fq file gzipped? = %s" %(gzbool)
         if gzbool == "YES":
                 print "unzipping file"
-                tempfq = open("tempfq",'w')
-                errlog = open("errlog1",'w')
+                tempfq = open("tempfq-"+uid,'w')
+                errlog = open("errlog1-"+uid,'w')
                 cmd = 'gunzip -c %s' % (fqFile)
                 subprocess.check_call(cmd,shell=True,stdout=tempfq,stderr=errlog)
-                fqFile = "tempfq"
+                fqFile = "tempfq-"+uid
                 tempfq.close()
                 errlog.close()
 
         bc = open(bcFile,'r')
+        bc_for_file_names = ''
         for line in bc:
                 lineItems = line.split()
                 barcode = lineItems[0]
                 barcode_up = barcode.upper()
+                #Use first barcode in file for naming files to avoid overwriting files of other processes.
+                if not bc_for_file_names:                
+                    bc_for_file_names = re.sub(r'[^0-9a-zA-Z]', '', barcode_up)
                 name = lineItems[1]
                 print barcode
                 parsed_file_name = str(OutFolder + "/indiv" + name + "_" + barcode)
                 parsed_file = open(parsed_file_name,'w')
-                errlog = open("errlog2",'w')
+                errlog = open("errlog2-" + bc_for_file_names,'w')
                 #First grep finds lines starting with the barcode and includes the line above, and two lines below each match
                 #Pipe into grep again to filter out -- between matches which some (versions??) of grep insert
                 #Pipe into sed to remove barcodes (optional offset) and associated quality scores from each line
@@ -129,23 +143,28 @@ def main():
                 allbc.append(barcode.upper())
         bc.close()
         
+        #This code is commented out since we're typically only running on one 
+        #barcode at a time and would thus show every other barcode as a non-match
+        '''
         """save barcodes in new file -- bconly -- with caret at front, use this as search file"""
-        output_bc_file = open("bcOnly",'w')
+        output_bc_file = open("bcOnly-" + bc_for_file_names,'w')
         for line in allbc:
                 output_bc_file.write("^" + line + "\n")
         output_bc_file.close()
-        bconly  = "bcOnly"
-        nomatch_file = open(OutFolder + "/nomatches",'w')
-        errlog = open("errlog4",'w')
+        bconly  = "bcOnly-" + bc_for_file_names
+        nomatch_file = open(OutFolder + "/nomatches-" + bc_for_file_names,'w')
+        errlog = open("errlog4-" + bc_for_file_names,'w')
         cmd = "awk 'NR%%4==2' %s | grep -f %s -v" % (fqFile, bconly)
         try:
             nomatch = subprocess.call(cmd, shell=True, stdout=nomatch_file,stderr=errlog)
         finally:
-	    errlog.close()
+            errlog.close()
             nomatch_file.close()
+        '''
         
         """delete tempfq, the gunzipped original file"""
-        cmd = 'rm tempfq bcOnly errlog1 errlog2 errlog3 errlog4'
+        cmd = 'rm tempfq-%s bcOnly-%s errlog1-%s errlog2-%s' % (
+            uid,bc_for_file_names,uid,bc_for_file_names)
         subprocess.call(cmd,shell=True)
         
         
