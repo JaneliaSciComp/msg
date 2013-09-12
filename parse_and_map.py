@@ -152,7 +152,13 @@ class ParseAndMap(CommandLineApp):
         if self.options.map_only:
             #Parsing should happen here when user has selected the new parser, this should happen before any mapping
             if self.options.new_parser:
-                self.parse_all()
+                #check if the output file already exists
+                fastq_file = 'indiv' + self.bc[0][1] + '_' + self.bc[0][0]
+                found_fastq = [f for f in os.listdir(self.parsedir) if f.startswith(fastq_file)]
+                if found_fastq:
+                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output file %s exists' % found_fastq[0] + bcolors.ENDC            
+                else:
+                    self.parse_all()
             else:
                 print bcolors.WARN + 'Refusing to parse raw reads: --map-only option is in effect' + bcolors.ENDC
         else:
