@@ -177,13 +177,17 @@ class ParseAndMap(CommandLineApp):
         
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
-#        elif os.path.exists(self.samdir):
-#            print bcolors.WARN + 'Refusing to map parsed reads: samfiles output directory %s exists' % self.samdir + bcolors.ENDC
         else:
-            self.map()
-            if self.options.bwa_alg == 'aln':
-                #bwasw and stampy don't make sai files    
-                self.delete_files()
+            #Before mapping, check if the file already exists so we don't waste time re-running.
+            #example matching name *indivA12_AATAAG_par[12].sam matches aln_indivA12_AATAAG_par1.sam
+            sam_file_pattern = self.samdir + "/*%s_par[12].sam" % ('indiv' + self.bc[0][1] + '_' + self.bc[0][0])
+            if len(glob.glob(sam_file_pattern)) == 2:
+                print bcolors.WARN + 'Refusing to map parsed reads: Sam files matching pattern "%s" already exist.' % sam_file_pattern + bcolors.ENDC
+            else:
+                self.map()
+                if self.options.bwa_alg == 'aln':
+                    #bwasw and stampy don't make sai files    
+                    self.delete_files()
 
     def parse_all(self):
         """Main parsing function"""
