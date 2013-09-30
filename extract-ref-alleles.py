@@ -114,9 +114,10 @@ class App(CommandLineApp):
         sim_outfile.close()
         sec_outfile.close()
         
-        if delete_original_files:
-            os.remove(sim_samfilepath)
-            os.remove(sec_samfilepath)
+        #Don't delete original since it would prevent us from re-running
+        #if delete_original_files:
+        #    os.remove(sim_samfilepath)
+        #    os.remove(sec_samfilepath)
         
         return out_sim_samfilepath, out_sec_samfilepath
     

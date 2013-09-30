@@ -178,16 +178,10 @@ class ParseAndMap(CommandLineApp):
         if self.options.parse_only:
             print bcolors.WARN + 'Refusing to map parsed reads: --parse-only option is in effect' + bcolors.ENDC
         else:
-            #Before mapping, check if the file already exists so we don't waste time re-running.
-            #example matching name *indivA12_AATAAG_par[12].sam matches aln_indivA12_AATAAG_par1.sam
-            sam_file_pattern = self.samdir + "/*%s_par[12].sam" % ('indiv' + self.bc[0][1] + '_' + self.bc[0][0])
-            if len(glob.glob(sam_file_pattern)) == 2:
-                print bcolors.WARN + 'Refusing to map parsed reads: Sam files matching pattern "%s" already exist.' % sam_file_pattern + bcolors.ENDC
-            else:
-                self.map()
-                if self.options.bwa_alg == 'aln':
-                    #bwasw and stampy don't make sai files    
-                    self.delete_files()
+            self.map()
+            if self.options.bwa_alg == 'aln':
+                #bwasw and stampy don't make sai files    
+                self.delete_files()
 
     def parse_all(self):
         """Main parsing function"""
@@ -569,7 +563,7 @@ class ParseAndMap(CommandLineApp):
 
             if ((os.path.exists(aln_par1_sam) or os.path.exists(aln_par1_sam+'.gz')) and
                 (os.path.exists(aln_par2_sam) or os.path.exists(aln_par2_sam+'.gz'))): 
-                print bcolors.WARN + 'Refusing to map reads for ' + fastq_file_name + bcolors.ENDC
+                print bcolors.WARN + ('Refusing to map reads for %s. Files already exist.' % fastq_file_name) + bcolors.ENDC
                 continue
 
             file_par1_log = open(os.path.join(self.logdir, fastq_file_name + par1 + '.log'), "w")
@@ -649,8 +643,11 @@ class ParseAndMap(CommandLineApp):
                         shell=True, stderr=log_file)
                     result = subprocess.check_call("%s -f %s %s" % (put_back_command, sam_file + '.added_calmd.sam',sam_file), shell=True)
 
-            print "done sample " + fastq_file   
-
+            assert (os.path.exists(aln_par1_sam) or os.path.exists(aln_par1_sam+'.gz'))
+            assert (os.path.exists(aln_par2_sam) or os.path.exists(aln_par2_sam+'.gz'))
+            #subprocess.check_call("chmod 555 %s" % self.samdir,shell=True) #used for debugging to see what was deleting files downstream
+            print "done sample %s. Created %s and %s" % (fastq_file, aln_par1_sam, aln_par2_sam)
+            
             if int(self.options.num_ind) == sample_num:##0.2.6
                 break
             
