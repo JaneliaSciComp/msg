@@ -64,6 +64,16 @@ sub parse_config {
     else {
         $default_params{'addl_qsub_option_for_exclusive_node'} = '';
     }
+    
+    if (defined $default_params{'custom_qsub_options_for_all_cmds'} && $default_params{'custom_qsub_options_for_all_cmds'}) {
+        #example: go from user msg.cfg entered "-l excl=true" to "-l excl=true "
+        $default_params{'custom_qsub_options_for_all_cmds'} = $default_params{'custom_qsub_options_for_all_cmds'}.' ';
+    }
+    else {
+        $default_params{'addl_qsub_option_for_exclusive_node'} = '';
+    }
+    
+    #Update qsub for PE option with number threads requested
     if (defined $default_params{'addl_qsub_option_for_pe'} && $default_params{'addl_qsub_option_for_pe'}) {
         #example: go from user msg.cfg entered "-pe batch" to "-pe batch 8 "
         $default_params{'addl_qsub_option_for_pe'} = $default_params{'addl_qsub_option_for_pe'}." $update_nthreads ";

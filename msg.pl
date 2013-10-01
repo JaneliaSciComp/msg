@@ -58,6 +58,7 @@ GetOptions(
     'new_parser=i' => \$new_parser,
     'new_parser_offset=i' => \$new_parser_offset,
     'new_parser_filter_out_seq=s' => \$new_parser_filter_out_seq,
+    'custom_qsub_options_for_all_cmds=s' => \$custom_qsub_options_for_all_cmds
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -101,6 +102,8 @@ print "gff_thresh_conf $gff_thresh_conf\n\n";
 print "new_parser $new_parser\n\n";
 print "new_parser_offset $new_parser_offset\n\n";
 print "new_parser_filter_out_seq $new_parser_filter_out_seq\n\n";
+#only update parentals passes this in, so you won't see it on standard msg runs:
+print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -171,8 +174,8 @@ sub run_stampy_on_cluster {
     
     #run it
     &Utils::system_call("qsub", "-t 1-${stampy_pseudo_threads}:1", $addl_qsub_option_for_pe, 
-        "-N msgRun0-$sp-stampy.$$", "-V", "-sync y", "-cwd", "-b y",
-        "./msgRun0-$sp-stampy.sh");
+        "-N msgRun0-$sp-stampy.$$", "-V", "-sync y", "-cwd", &Utils::strip($custom_qsub_options_for_all_cmds),
+        "-b y", "./msgRun0-$sp-stampy.sh");
     
     #we won't get here until qsub is done (-sync y above)
     #merge all of the temp files back together

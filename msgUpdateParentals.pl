@@ -21,6 +21,7 @@ my %default_params = (
         max_coverage_exceeded_state => 'N',
         addl_qsub_option_for_exclusive_node => '',
         addl_qsub_option_for_pe => '',
+        custom_qsub_options_for_all_cmds => '',
         bwa_alg => 'aln',
         bwa_threads => '1',
         use_stampy => '0',
@@ -84,6 +85,10 @@ if (exists $params{'parent1_reads'}) {
     if ($params{'addl_qsub_option_for_pe'}) {
         print OUT ' --addl_qsub_option_for_pe pe';
     }
+    if ($params{'custom_qsub_options_for_all_cmds'}) {
+        print OUT ' --custom_qsub_options_for_all_cmds "' . &Utils::strip($params{'custom_qsub_options_for_all_cmds'}) .'"';
+    }
+    
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRunU0-1.sh");
@@ -122,7 +127,11 @@ if (exists $params{'parent2_reads'}) {
     }
     if ($params{'addl_qsub_option_for_pe'}) {
         print OUT ' --addl_qsub_option_for_pe pe';
-    }    
+    }
+    if ($params{'custom_qsub_options_for_all_cmds'}) {
+        print OUT ' --custom_qsub_options_for_all_cmds "' . &Utils::strip($params{'custom_qsub_options_for_all_cmds'}) .'"';
+    }
+    
 	print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRunU0-2.sh");
@@ -137,10 +146,10 @@ mkdir "msgUpdateParentalsError.$$" unless (-d "msgUpdateParentalsError.$$");
 
 if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    if ($params{'cluster'} != 0) {
-        &Utils::system_call("qsub -N msgRunU0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRunU0-1.sh") ;
-        &Utils::system_call("qsub -N msgRunU0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRunU0-2.sh") ;
+        &Utils::system_call("qsub -N msgRunU0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRunU0-1.sh") ;
+        &Utils::system_call("qsub -N msgRunU0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRunU0-2.sh") ;
         #Cleanup - move output files to folders
-        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-1.$$,msgRunU0-2.$$ -cwd -b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
+        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-1.$$,msgRunU0-2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
    } else {
         &Utils::system_call("./msgRunU0-1.sh > msgRunU0-1.$$.out 2> msgRunU0-1.$$.err") ;
         &Utils::system_call("./msgRunU0-2.sh > msgRunU0-2.$$.out 2> msgRunU0-2.$$.err") ;
@@ -149,9 +158,9 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    }
 } elsif ( exists $params{'parent1_reads'} ) {
     if ($params{'cluster'} != 0) {
-        &Utils::system_call("qsub -N msgRunU0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRunU0-1.sh") ;
+        &Utils::system_call("qsub -N msgRunU0-1.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRunU0-1.sh") ;
         #Cleanup - move output files to folders
-        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-1.$$ -cwd -b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
+        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-1.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
     } else {
         &Utils::system_call("./msgRunU0-1.sh > msgRunU0-1.$$.out 2> msgRunU0-1.$$.err") ;
         #Cleanup - move output files to folders
@@ -159,9 +168,9 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
     }
 } elsif ( exists $params{'parent2_reads'} ) {
    if ($params{'cluster'} != 0) {
-        &Utils::system_call("qsub -N msgRunU0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRunU0-2.sh") ;
+        &Utils::system_call("qsub -N msgRunU0-2.$$ $params{'addl_qsub_option_for_pe'}-cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRunU0-2.sh") ;
         #Cleanup - move output files to folders
-        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-2.$$ -cwd -b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
+        &Utils::system_call("qsub -N msgRunU6.$$ -hold_jid msgRunU0-2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRunU*.${$}.e** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.pe** msgUpdateParentalsError.$$; mv -f msgRunU*.${$}.o* msgUpdateParentalsOut.$$; mv -f msgRunU*.${$}.po* msgUpdateParentalsOut.$$; mv -f *.trim.log msgUpdateParentalsOut.$$\"");
    } else {
         &Utils::system_call("./msgRunU0-2.sh > msgRunU0-2.$$.out 2> msgRunU0-2.$$.err") ;
         #Cleanup - move output files to folders

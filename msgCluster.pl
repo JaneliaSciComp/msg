@@ -37,6 +37,7 @@ my %default_params = (
         theta        => '1',
         addl_qsub_option_for_exclusive_node => '',
         addl_qsub_option_for_pe => '',
+        custom_qsub_options_for_all_cmds => '',
         bwa_alg => 'aln',
         bwa_threads => '1',
         use_stampy => '0',
@@ -219,24 +220,24 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 ### Run jobs!
 
 if ($params{'cluster'} != 0) {
-    &Utils::system_call("qsub -N msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n ./msgRun1.sh") ; 
+    &Utils::system_call("qsub -N msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRun1.sh") ; 
 }
 else {
     &Utils::system_call("./msgRun1.sh > msgRun1.$$.out 2> msgRun1.$$.err") ; 
 }
 
 if ($params{'cluster'} != 0) {
-   &Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
+   &Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
    #&Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
-   &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
-   &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd -b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
-   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd -b y -V -sync n python msg/validate.py $params{'barcodes'}");
+   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'}");
    #Cleanup - move output files to folders, remove barcode related files
-   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd -b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
    #Notify users that MSG run has completed
    if ($params{'email_host'} && $params{'notify_emails'}) {
-        &Utils::system_call("qsub -N msgRun7.$$ -hold_jid msgRun6.$$ -cwd -b y -V -sync n python msg/send_email.py -e $params{'email_host'}" .
+        &Utils::system_call("qsub -N msgRun7.$$ -hold_jid msgRun6.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/send_email.py -e $params{'email_host'}" .
             " -t $params{'notify_emails'} -s \\\"MSG Run has completed\\\"" .
             " -b \\\"NOTE: Output and error messages are located in: msgOut.$$ and msgError.$$\\\""
             );
