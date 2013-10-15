@@ -6,6 +6,8 @@ perl --version | head -n 2
 echo "Python:"
 python -V 2>&1 >/dev/null
 which python
+echo "Python sys.path:"
+python -c "import sys; print sys.path"
 echo "R:"
 R --version | grep version
 echo "BWA:"
