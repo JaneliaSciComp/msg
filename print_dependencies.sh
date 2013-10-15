@@ -4,7 +4,8 @@ echo "The following tools/versions will be used:"
 echo "Perl:"
 perl --version | head -n 2
 echo "Python:"
-python -V
+python -V 2>&1 >/dev/null
+which python
 echo "R:"
 R --version | grep version
 echo "BWA:"

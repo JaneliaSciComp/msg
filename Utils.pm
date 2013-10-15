@@ -28,12 +28,12 @@ sub system_call {
 
 sub test_dependencies {
     # Make sure all required dependencies are installed
+    system_call("bash print_dependencies.sh | tee dependencies.out");
     my $last_path = getcwd();
     chdir('msg') or die "$!";
     #system_call("chmod 755 test_dependencies.sh");
     system_call("bash test_dependencies.sh");
     chdir($last_path) or die "$!";
-    system_call("bash print_dependencies.sh | tee dependencies.out");
 }
 
 sub parse_config {
