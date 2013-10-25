@@ -229,12 +229,13 @@ else {
 if ($params{'cluster'} != 0) {
    &Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
    #&Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
+   &Utils::system_call("qsub -N msgRun2a.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
    &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
    &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
    &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'}");
    #Cleanup - move output files to folders, remove barcode related files
-   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*\"");
+   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f temp.fq; rm -f $params{'barcodes'}.*\"");
    #Notify users that MSG run has completed
    if ($params{'email_host'} && $params{'notify_emails'}) {
         &Utils::system_call("qsub -N msgRun7.$$ -hold_jid msgRun6.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/send_email.py -e $params{'email_host'}" .
@@ -244,12 +245,13 @@ if ($params{'cluster'} != 0) {
     }
 } else { 
    &Utils::system_call("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
+   &Utils::system_call("python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
    &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
    &Utils::system_call("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
    &Utils::system_call("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
    #Cleanup - move output files to folders, remove barcode related files
-   &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f $params{'barcodes'}.*");
+   &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f temp.fq; rm -f $params{'barcodes'}.*");
    #Notify users that MSG run has completed
    if ($params{'email_host'} && $params{'notify_emails'}) {
      &Utils::system_call("python msg/send_email.py -e $params{'email_host'}" .

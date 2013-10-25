@@ -166,9 +166,14 @@ class ParseAndMap(CommandLineApp):
                 print bcolors.WARN + 'Parsing skipped, will parse at begining of mapping step' + bcolors.ENDC
                 #Skip parsing since it will happen in map step but go ahead and create directory to avoid race
                 #conditions
+                #Also go ahead and unzip gzipped reads file.
                 if not os.path.exists(self.parsedir):
                     print "Created parsedir %s" % self.parsedir
                     os.mkdir(self.parsedir)
+                if self.options.raw_data_file.lower().endswith('.gz') and not os.path.exists('temp.fq'):
+                    print "Uncompressing reads file %s for use with new parser" % self.options.raw_data_file
+                    os.system("gunzip -c %s > temp.fq" % self.options.raw_data_file)
+                    assert os.path.exists('temp.fq') #Make sure unzipped file was created
             else:
                 if os.path.exists(self.parsedir):
                     print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC            
@@ -376,14 +381,19 @@ class ParseAndMap(CommandLineApp):
                 os.remove("./" + fastq_file)
 
         raw_data = use_raw_data_file or self.options.raw_data_file
-        stats_file = open(raw_data+'_stats.txt','w')
-        
+        raw_data_dir_prefix = raw_data
+                
         print "Parsing data (%s) into individual barcode files" % raw_data    
         if self.options.new_parser:
+            #Make sure an unzipped version of the file was created for new parser
+            if not use_raw_data_file and self.options.raw_data_file.lower().endswith('.gz'):
+                assert os.path.exists('temp.fq')
+                raw_data = 'temp.fq'
             args = ["python", 
                 os.path.join(os.path.dirname(__file__), "grepfqparser.py"),
                 "-t", str(self.options.new_parser_offset), 
-                raw_data, self.options.barcodes_file, raw_data + '_parsed/']
+                raw_data, self.options.barcodes_file,
+                raw_data_dir_prefix + '_parsed/']
             print ' '.join(args)
             sys.stdout.flush()
             subprocess.check_call(args)
@@ -398,38 +408,13 @@ class ParseAndMap(CommandLineApp):
             sys.stdout.flush()
             subprocess.call(args) 
 
+            #create_stats(raw_data, self.barcodes_file) #now run as a separate job
+
             # Outputs separate file for each individual with barcode and identifier in filename
             # "indiv#_barcode"
-        
-            #print file with statistics of parsing
-            total_reads = 0
-            read_file = './'+raw_data+'_parsed/bad_barcodes'
-            number_reads = count_lines(read_file)/4
-            stats_file.write('bad_barcodes\t%s\n' %(number_reads))
-            total_reads += number_reads
-        
-            read_file = './'+raw_data+'_parsed/unreadable_barcodes'
-            number_reads = count_lines(read_file)/4
-            stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
-            total_reads += number_reads
-        
-            read_file = './'+raw_data+'_parsed/linkers'
-            number_reads = count_lines(read_file)/2
-            stats_file.write('linkers\t%s\n' %(number_reads))   
-            total_reads += number_reads
-        
-            read_file = './'+raw_data+'_parsed/junk'
-            number_reads = count_lines(read_file)/4
-            stats_file.write('junk\t%s\n' %(number_reads))   
-            total_reads += number_reads
-
-        total_reads = 0
         for ind in self.bc:
             file_name = 'indiv' + ind[1] + '_' + ind[0]
-            fastq_file = raw_data + '_parsed/' + file_name
-            number_reads = count_lines(fastq_file)/4
-            total_reads += number_reads
-            stats_file.write('indiv%s_%s\t%s\n' %(ind[1],ind[0],number_reads))
+            fastq_file = raw_data_dir_prefix + '_parsed/' + file_name
             #gzip output
             if GZIP_OUTPUT:
                 f_in = open(fastq_file, 'rb')
@@ -445,15 +430,12 @@ class ParseAndMap(CommandLineApp):
                 #ln trivia: symlink target should be relative to sym link, not where you are.
                 self.create_symlink(file_name, fastq_file)
             final_paths.append(fastq_file)
-        
-        stats_file.write('total_reads\t%s' %(total_reads))
-        stats_file.close()
-    
+       
         self.parsed_time = time.time()
         parsing_time = (self.parsed_time - self.start_time)
         print "Parsing took about %s minutes" %(parsing_time/60)
         return final_paths
-    
+       
     def create_symlink(self, file_path, shortcut_path):
         sym_link_args = 'ln -s %s %s.fq' % (file_path, shortcut_path)
         print "create ln with .fq extension:", sym_link_args

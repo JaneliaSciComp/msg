@@ -3,6 +3,7 @@
 
 import re
 import os
+import gzip
 try:
     from pylab import *
     from matplotlib.font_manager import FontProperties
@@ -23,12 +24,60 @@ def read_barcodes(barcodes_file):
 #    return variables, bc
 
 def count_lines(count_file):
-    filename = open(count_file,'r')
+    try:
+        if count_file.lower().endswith('.gz'):
+            filename = gzip.open(count_file, 'rb')
+        else:
+            filename = open(count_file,'r')
+    except IOError, Err:
+        print "count lines of %s. %s" % (count_file, str(Err))
+        return 0
     x = 0
     for line in filename:
         x+=1
-    return x
     filename.close()
+    return x
+
+def create_stats(raw_data, barcodes_file):
+    """Write out miscellaneous parsing stats."""
+    # "indiv#_barcode"
+    stats_file = open(raw_data+'_stats.txt','w')
+    #print file with statistics of parsing
+    total_reads = 0
+    read_file = './'+raw_data+'_parsed/bad_barcodes'
+    number_reads = count_lines(read_file)/4
+    stats_file.write('bad_barcodes\t%s\n' %(number_reads))
+    total_reads += number_reads
+
+    read_file = './'+raw_data+'_parsed/unreadable_barcodes'
+    number_reads = count_lines(read_file)/4
+    stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
+    total_reads += number_reads
+
+    read_file = './'+raw_data+'_parsed/linkers'
+    number_reads = count_lines(read_file)/2
+    stats_file.write('linkers\t%s\n' %(number_reads))   
+    total_reads += number_reads
+
+    read_file = './'+raw_data+'_parsed/junk'
+    number_reads = count_lines(read_file)/4
+    stats_file.write('junk\t%s\n' %(number_reads))   
+    total_reads += number_reads
+
+    total_reads = 0
+    for ind in read_barcodes(barcodes_file):
+        file_name = 'indiv' + ind[1] + '_' + ind[0]
+        fastq_file = raw_data + '_parsed/' + file_name
+        try:
+            number_reads = count_lines(fastq_file)/4
+        except IOError:
+            #could have been gzipped
+            number_reads = count_lines(fastq_file+'.gz')/4
+        total_reads += number_reads
+        stats_file.write('indiv%s_%s\t%s\n' %(ind[1],ind[0],number_reads))
+   
+    stats_file.write('total_reads\t%s' %(total_reads))
+    stats_file.close()
 
 def call_genotypes(data_filename,geno_span,ind_list,cross_type,sex,input_file,sld_wdw,sld_wdw_step,cutoffs,sp1,sp2,chrom_lgth):
     indiv_name = "indiv"+ ind_list[1] + "_" + ind_list[0]

@@ -72,12 +72,6 @@ def main():
         fqFile = arg[0]
         bcFile = arg[1]
         OutFolder = arg[2]
-        if len(arg) > 3:
-                gzbool = arg[3]
-                gzbool = gzbool.upper()
-        else:
-                gzbool = "YES"
-
 
         if os.path.isdir(OutFolder):
                 print "Directory %s exists" %(OutFolder)
