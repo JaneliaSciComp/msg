@@ -24,13 +24,15 @@ def read_barcodes(barcodes_file):
 #    return variables, bc
 
 def count_lines(count_file):
+    if not os.path.exists(count_file):
+        count_file += '.gz'
     try:
         if count_file.lower().endswith('.gz'):
             filename = gzip.open(count_file, 'rb')
         else:
             filename = open(count_file,'r')
     except IOError, Err:
-        print "count lines of %s. %s" % (count_file, str(Err))
+        print "count lines of '%s'. %s" % (count_file, str(Err))
         return 0
     x = 0
     for line in filename:
