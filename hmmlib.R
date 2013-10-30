@@ -73,7 +73,7 @@ forwardback.ded <- function (x, Pi, delta, distn, pm, pn = NULL, fortran = FALSE
     return(list(logalpha = logalpha, logbeta = logbeta, LL = LL))
 }
 
-Pr.y.given.z <- function(y, p, eps, ploidy=2, log=TRUE, C=FALSE, norm=FALSE, dir=".", chrom="none", id="id") {
+Pr.y.given.z <- function(y, p, eps, n=50, ploidy=2, log=TRUE, C=FALSE, norm=FALSE, dir=".", chrom="none", id="id") {
     alleles <- c("A","C","G","T")
     J <- length(alleles)
     L <- nrow(y)
@@ -89,7 +89,7 @@ Pr.y.given.z <- function(y, p, eps, ploidy=2, log=TRUE, C=FALSE, norm=FALSE, dir
         write.table(cbind(y, p1, p2, eps), file=tmpfile,
                     sep="\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
 
-        pipa <- pipe(sprintf("%s/hmmprobs -t %d -p %d < %s", dir, L, ploidy, tmpfile))
+        pipa <- pipe(sprintf("%s/hmmprobs -t %d -p %d -n %d < %s", dir, L, ploidy, n, tmpfile))
         #pipa <- pipe(sprintf("%s/hmmprobs -t %d -e %f -p %d < %s", dir, L, eps, ploidy, tmpfile))
 		  on.exit({close(pipa) ; file.remove(tmpfile) })
 		  #on.exit({close(pipa) ; })

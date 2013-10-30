@@ -14,7 +14,6 @@ $src = dirname $0 ;
 $update_genomes = $false ;
 
 GetOptions(
-<<<<<<< HEAD
     'barcodes|b=s' => \$barcodes,
     're_cutter=s' => \$re_cutter,
     'linker_system=s' => \$linker_system,
@@ -69,32 +68,6 @@ GetOptions(
 $GEN_MD_TAGS = $true;
 
 ############################################
-=======
-	'barcodes|b=s' => \$barcodes,
-   're_cutter=s' => \$re_cutter,
-   'linker_system=s' => \$linker_system,
-	'reads|i=s' => \$raw_read_data,
-	'update|u' => \$update_genomes,
-	'parent1=s' => \$parent1_genome,
-	'parent2=s' => \$parent2_genome,
-	'parent1-reads=s' => \$parent1_reads,
-	'parent2-reads=s' => \$parent2_reads,
-	'update_minQV=i' => \$update_minQV,
-	'min_coverage=i' => \$min_coverage,
-	'threads|t=i' => \$update_nthreads,
-	'parse_or_map=s' => \$parse_or_map,
-	'priors=s' => \$priors,
-	'chroms=s' => \$chroms,
-	'sexchroms=s' => \$sexchroms,
-	'chroms2plot=s' => \$chroms2plot,
-	'deltapar1=s' => \$deltapar1,
-	'deltapar2=s' => \$deltapar2,
-	'recRate=s' => \$recRate,
-	'rfac=s' => \$rfac,
-	'bwaindex1=s' => \$bwaindex1,
-	'bwaindex2=s' => \$bwaindex2
-	) ;
->>>>>>> parent of a4e3985... updated for multiple reads
 
 print "msg version:  $version\n" ;
 print `date` ;
@@ -442,18 +415,13 @@ if ($parse_or_map eq '--map-only') {
    			 '-y', $chroms2plot,
    			 '-f', $deltapar1,
    			 '-g', $deltapar2,
-   			 '-a', $recRate,
    			 '-r', $rfac,
    			 '-x', $sexchroms,
-<<<<<<< HEAD
    			 '-z', $priors,
    			 '-t', $theta,
              '-w', $bwa_alg,
              '-e', $use_stampy,
              '-m', $gff_thresh_conf,
-=======
-   			 '-z', $priors
->>>>>>> parent of a4e3985... updated for multiple reads
    		  ) ;
 
    } close BARCODE;
