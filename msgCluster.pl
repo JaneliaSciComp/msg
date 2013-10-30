@@ -11,6 +11,7 @@ printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$s
 &Utils::test_dependencies();
 
 ### Default parameters
+<<<<<<< HEAD
 ### All of these parameters are required
 my %default_params = (
         barcodes       => 'NULL',
@@ -56,6 +57,32 @@ my %default_params = (
         new_parser => '0',
         new_parser_offset => '0',
         new_parser_filter_out_seq => '',
+=======
+die "ERROR: Can't locate msg.cfg.\n" unless (-e 'msg.cfg');
+my %params = (
+         barcodes       => 'NULL',
+         re_cutter      => 'MseI',
+         linker_system  => 'Dros_SR_vII',
+	      reads          => 'NULL',
+	      parent1        => 'NULL',
+	      parent2        => 'NULL',
+	      chroms         => 'all',
+	      sexchroms      => 'X',
+	      chroms2plot    => 'all',
+	      deltapar1      => '.01',
+	      deltapar2      => '.01',
+	      recRate        => '3',
+	      rfac		      => '1',
+	      thinfac	      => '1',
+	      difffac	      => '.01',
+	      priors         => '0,.5,.5',
+	      bwaindex1      => 'bwtsw',
+	      bwaindex2      => 'bwtsw',
+	      pnathresh      => '0.03',
+	      cluster        => '1',
+	      threads        => '1',
+	      queue          => '1day'
+>>>>>>> parent of a4e3985... updated for multiple reads
     );
 
 my $params = Utils::parse_config('msg.cfg', \%default_params);
@@ -141,6 +168,7 @@ open (OUT,'>msgRun2.sh');
 
 if ($params{'cluster'} != 0) {
    print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
+<<<<<<< HEAD
         "start=\$SGE_TASK_ID\n\n" .
         "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n" .
         "for ((h=\$start; h<=\$end; h++)); do\n" .
@@ -207,6 +235,46 @@ if ($params{'cluster'} != 0) {
         ' --linker_system ' . $params{'linker_system'} .
         ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
         ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
+=======
+       "start=\$SGE_TASK_ID\n\n" .
+       "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n" .
+       "for ((h=\$start; h<=\$end; h++)); do\n" .
+#       "   sed -n '1,2p' $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
+#       "   sed -n \"\${h}p\" $params{'barcodes'} >> $params{'barcodes'}.\$h\n" .
+       "   sed -n \"\${h}p\" $params{'barcodes'} > $params{'barcodes'}.\$h\n" .
+       '   perl msg/msg.pl ' .
+       ' --barcodes ' . $params{'barcodes'} . '.$h' .
+       ' --reads ' . $params{'reads'} . 
+       ' --parent1 ' . $params{'parent1'} . 
+       ' --parent2 ' . $params{'parent2'} .
+       ' --chroms ' . $params{'chroms'} .
+       ' --sexchroms ' . $params{'sexchroms'} .
+       ' --chroms2plot ' . $params{'chroms2plot'} .
+       ' --parse_or_map map-only' .
+       ' --deltapar1 ' . $params{'deltapar1'} .
+       ' --deltapar2 ' . $params{'deltapar2'} .
+       ' --recRate ' . $params{'recRate'} .
+       ' --rfac ' . $params{'rfac'} .
+       ' --priors ' . $params{'priors'} .
+       " || exit 100\ndone\n" .
+       "/bin/date\n";
+} else {
+   print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n" .
+       '   perl msg/msg.pl ' .
+       ' --barcodes ' . $params{'barcodes'} .
+       ' --reads ' . $params{'reads'} . 
+       ' --parent1 ' . $params{'parent1'} . 
+       ' --parent2 ' . $params{'parent2'} .
+       ' --chroms ' . $params{'chroms'} .
+       ' --sexchroms ' . $params{'sexchroms'} .
+       ' --chroms2plot ' . $params{'chroms2plot'} .
+       ' --parse_or_map map-only' .
+       ' --deltapar1 ' . $params{'deltapar1'} .
+       ' --deltapar2 ' . $params{'deltapar2'} .
+       ' --recRate ' . $params{'recRate'} .
+       ' --rfac ' . $params{'rfac'} .
+       ' --priors ' . $params{'priors'} .
+>>>>>>> parent of a4e3985... updated for multiple reads
        "\n";
     }
 close OUT;
