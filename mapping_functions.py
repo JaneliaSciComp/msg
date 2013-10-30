@@ -43,7 +43,11 @@ def count_lines(count_file):
 def create_stats(raw_data, barcodes_file):
     """Write out miscellaneous parsing stats."""
     # "indiv#_barcode"
-    stats_file = open(raw_data+'_stats.txt','w')
+    stats_file_name = raw_data+'_stats.txt'
+    if os.path.exists(stats_file_name):
+        print "Stats file '%s' already exists. Skipping" % stats_file_name
+        return
+    stats_file = open(stats_file_name,'w')
     #print file with statistics of parsing
     total_reads = 0
     read_file = './'+raw_data+'_parsed/bad_barcodes'
