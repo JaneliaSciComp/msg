@@ -300,7 +300,7 @@ for(indiv in indivs) {
 				}
 						
 				for (g in 1:length(qual)) {
-					qual_corrected[g]<-qual[g]*(theta^(order(qual)[g]-1)) ## quality value correction
+					qual_corrected[g]<-qual[g]*(theta^(rank(-qual)[g]-1)) ## quality value correction
 					y[i,eps[g]] <- 10^(-(qual_corrected[g])/10)
 				}
 			}
