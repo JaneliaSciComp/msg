@@ -15,17 +15,19 @@ void usage() ;
 void error(char *fmt, ...) ;
 
 int main(int argc, char **argv) {
-    int T = 0, t, j, k, c, a, a1, a2, pop, n, y[J], ploidy = -1, nstates ;
-    double *popfreq, eps, //eps=-1,
+    int T = 0, t, j, k, c, a, a1, a2, pop, n, Q=50, y[Q], ploidy = -1, nstates ;
+    double *popfreq, e[Q],//eps, //eps=-1,
         p[NUMPOPS][J],
         Pr_y_given_z[K],
         Pr_a_given_g[J][J][J],
         Pr_g_given_z[K], Pr_y_given_g ;
 
-    while((c = getopt(argc, argv, "p:t:")) != -1) {
+    while((c = getopt(argc, argv, "p:t:n:")) != -1) {
         switch(c) {
         case 'p': ploidy = atoi(optarg) ; break ;
         case 't': T = atoi(optarg) ; break ;
+		/* read in number of reads per site */
+		case 'n': Q = atoi(optarg) ; break ;
         case '?': usage() ;
         }
     }
@@ -44,29 +46,31 @@ int main(int argc, char **argv) {
     }
 
     for(t = 0 ; t < T ; t++) {
-        for(j = 0 ; j < J ; j++)
-            if(scanf("%d", y+j) != 1) error("(hmmprob) Error reading count of allele %d on line %d\n", j, t+1) ;
+        for(j = 0 ; j < Q ; j++)
+            if(scanf("%d", y+j) != 1) error("(hmmprob) Error reading allele %d on line %d\n", j, t+1) ;
         for(pop = 0 ; pop < NUMPOPS ; pop++) {
             for(j = 0 ; j < J ; j++)
                 if(scanf("%lf", p[pop] + j) != 1)
                     error("(hmmprob) Error reading probability of allele %d in population %d on line %d\n", j, pop, t+1) ;
         }
 
-        if(scanf("%lf", &eps) != 1) error("(hmmprob) Error reading eps %f on line %d\n", eps, t+1) ;
-
+        //if(scanf("%lf", &eps) != 1) error("(hmmprob) Error reading eps %f on line %d\n", eps, t+1) ;
+		/* Read in eps for each read */
+        for(j = 0 ; j < Q ; j++)
+            if(scanf("%lf", e+j) != 1) error("(hmmprob) Error reading eps of allele %d on line %d\n", j, t+1) ;
+			
         for(k = 0 ; k < nstates ; k++) Pr_y_given_z[k] = 0 ;
 
         for(a1 = 0 ; a1 < J ; a1++) {
             for(a2 = 0 ; a2 < J ; a2++) {
                 if( ploidy == 1 && a2 > 0 ) break ;
-                /* Counts y are multinomial given cell probabilities
-                   Pr_a_given_g (no need to bother with normalising
-                   constant). */
+                /* Treat each read as an independent event and multiply Pr_y_given_g  */
                 Pr_y_given_g = 1 ;
-                for(a = 0 ; a < J ; a++)
-                    Pr_y_given_g *= pow(Pr_a_given_g[a][a1][a2] * (1 - 3*eps/4) + (1 - Pr_a_given_g[a][a1][a2]) * eps/4, y[a]) ;
-                    //Pr_y_given_g *= pow(Pr_a_given_g[a][a1][a2], y[a]) ;
-
+                for(a = 0 ; a < Q ; a++) {
+                   // Pr_y_given_g *= pow(Pr_a_given_g[a][a1][a2] * (1 - 3*eps/4) + (1 - Pr_a_given_g[a][a1][a2]) * eps/4, y[a]) ;
+					if (y[a]!=5)
+						Pr_y_given_g *= Pr_a_given_g[y[a]][a1][a2] * (1 - 3*e[a]/4) + (1 - Pr_a_given_g[y[a]][a1][a2]) * e[a]/4 ;
+				}
                 /* Pr this genotype given ancestry */
                 if(ploidy == 2) {
                     Pr_g_given_z[0] = p[0][a1] * p[0][a2] ;
