@@ -20,8 +20,11 @@ deltapar1 <- as.numeric(opts$p)
 deltapar2 <- as.numeric(opts$q)
 rfac <- as.numeric(opts$r)
 priors <- unlist(strsplit(opts$z,split=","))
+<<<<<<< HEAD
 theta <- as.numeric(opts$t)
 gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Geneious
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -32,6 +35,12 @@ contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
 contigs <- sort(as.vector(contigLengths$chr))
 rownames(contigLengths) <- contigLengths$chr
 
+<<<<<<< HEAD
+=======
+### Expected number of recombination events
+r <- as.numeric(opts$a) / sum(contigLengths[,"length"])
+
+>>>>>>> parent of a4e3985... updated for multiple reads
 main.contigs <- unlist(strsplit(opts$c,split=","))
 plot.contigs <- unlist(strsplit(opts$y,split=","))
 if(opts$c == "all") main.contigs <- contigs;
@@ -43,6 +52,7 @@ plotPadding <- 10^(ceiling(log10(aveSpace))-2)
 
 alleles <- c("A","C","G","T")
 
+<<<<<<< HEAD
 output_geneious_file <- function (gff_thresh_conf, x, y, par1homo_col, par2homo_col, indiv,
     contig, contigLengths) {
     ### Output a gff file for Geneious
@@ -154,6 +164,8 @@ output_geneious_file <- function (gff_thresh_conf, x, y, par1homo_col, par2homo_
     }
 }
 
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
 for(indiv in indivs) {
     cat(indiv, "\n")
     ## if(opts$c == "all")
@@ -188,7 +200,10 @@ for(indiv in indivs) {
                 next
             } 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
             data <- read.data(dir, indiv, contig)
             data$read <- factor.contiguous(data$pos)
             total_sites <- length(unique(data$read));
@@ -215,12 +230,21 @@ for(indiv in indivs) {
             cat("\tRemoving", sum(!ok), "sites at which par1 == par2\n")
             data <- data[ok,,drop=F]
 
+<<<<<<< HEAD
 			data$count <- data$A + data$C + data$G + data$T #+ data$N
 			ok <- data$count >= minCoverage
             cat("\tRemoving", sum(!ok), "sites at where coverage is < ",minCoverage,"\n")
 			data <- data[ok,,drop=F]
 
 			if (nrow(data)==0) next
+=======
+				data$count <- data$A + data$C + data$G + data$T #+ data$N
+				ok <- data$count >= minCoverage
+            cat("\tRemoving", sum(!ok), "sites at where coverage is < ",minCoverage,"\n")
+				data <- data[ok,,drop=F]
+
+				if (nrow(data)==0) next
+>>>>>>> parent of a4e3985... updated for multiple reads
             
             if(one.site.per.read) {
                 ## Sample one site per read
@@ -232,15 +256,22 @@ for(indiv in indivs) {
                 cat("\tNumber of informative markers:", nrow(data), "\n")
             }
 
+<<<<<<< HEAD
 
             cat("\tFinal total of", nrow(data), "sites at which par1 != par2\n")
 				#if (nrow(data)<20) next
 			if (nrow(data)==0) next
 			
+=======
+            cat("\tFinal total of", nrow(data), "sites at which par1 != par2\n")
+				#if (nrow(data)<20) next
+
+>>>>>>> parent of a4e3985... updated for multiple reads
             L <- nrow(data)
             K <- length(ancestries)
 
             ## Transition probabilities
+<<<<<<< HEAD
             if(contig %in% main.contigs) {
                 r <- 1 / contigLengths[contig,"length"]
 				} else {
@@ -248,6 +279,8 @@ for(indiv in indivs) {
                 r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
 				}
 
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
             d <- c(NA, diff(data$pos))
             p <- 1 - exp(-r*d*rfac)
             Pi <- array(dim=c(L,K,K), dimnames=list(NULL, ancestries, ancestries))
@@ -272,6 +305,7 @@ for(indiv in indivs) {
             p2 <- ppar2[data$par2ref,,drop=F]
             p12 <- array(c(p1,p2), dim=c(dim(p1),2))
             dimnames(p12) <- list(NULL, alleles, NULL)
+<<<<<<< HEAD
 
 		    ## Take all (<=50) reads for each site
 		    N<-min(max(data$A+data$C+data$G+data$T+data$N),50) ## Total number of reads
@@ -310,6 +344,48 @@ for(indiv in indivs) {
             ## Emission probabilities
             prob = Pr.y.given.z(y=y[,read,drop=F], p=p12, n=N, eps=y[,eps,drop=F], ploidy=ploidy, C=TRUE, dir=dirname(dollar0), chrom=contig, id=indiv)
    			colnames(prob) <- paste("Pr(y|", ancestries, ")")
+=======
+            
+            ## Sample one read per site
+            y <- data[,c(alleles,"reads","quals","par1ref"),drop=F]
+				y$selected_allele <- NA
+				y$selected_qual <- NA
+
+            for(i in 1:nrow(y)) {
+					 if (sum(y[i,alleles]) > 1) {
+					 	reads2sample <- unlist(strsplit(cleanupReadPileup(y[i,"reads"],y[i,"par1ref"]),''))
+						sampled_index <- sample(length(reads2sample),1)
+					 	y[i,"selected_allele"] <- reads2sample[sampled_index]
+					 	y[i,"selected_qual"] <- unlist(strsplit(y[i,"quals"],''))[sampled_index]
+					 } else {
+						y[i,"selected_allele"] <- alleles[which(y[i,alleles] == 1)]
+
+                  ### is the length > 1?  if so, need to remove the other QVs corresponding to N's and others
+						y[i,"selected_qual"] <- y[i,"quals"]
+                  if (nchar(y[i,"quals"])>1) {
+						   #y[i,"selected_qual"] <- unlist(strsplit(data[i,"quals"],""))[which(unlist(strsplit(cleanupReadPileup(data[i,"reads"],y[i,"par1ref"]),""))==y[i,"selected_allele"])]
+							y_info <- list(reads=cleanupReadPileup(y[i,"reads"],y[i,"par1ref"]),quals=y[i,"quals"])
+							#y_info <- list(reads=y[i,"reads"],quals=y[i,"quals"])
+							y[i,"selected_qual"] <- removeNs(y_info$reads,y_info$quals)
+                  }
+					 }
+					 y[i,alleles] <- 0
+					 y[i,y[i,"selected_allele"]] <- 1
+				}
+
+				data$read_allele <- as.vector(y[,"selected_allele"])
+				data$read_qual   <- as.vector(y[,"selected_qual"])
+
+				### set epsilon based on quality value
+				### Phred QV = -10 log10(error)
+				data$eps <- 10^(-(unlist(lapply(data[,"read_qual",drop=F],charToInt))-33)/10)
+				data <- data[is.na(data$eps)==F,,drop=F];
+				if (nrow(data)==0) next
+
+            ## Emission probabilities
+            prob = Pr.y.given.z(y=y[,alleles,drop=F], p=p12, eps=data$eps, ploidy=ploidy, C=TRUE, dir=dirname(dollar0), chrom=contig, id=indiv)
+            colnames(prob) <- paste("Pr(y|", ancestries, ")")
+>>>>>>> parent of a4e3985... updated for multiple reads
             data <- cbind(data, prob)
             data$est <- apply(prob, 1, which.max)
             
@@ -321,14 +397,20 @@ for(indiv in indivs) {
             data <- cbind(data, Pr.z.given.y)
             attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
+<<<<<<< HEAD
         
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
         }
         cat("Saving data...")
         save(dataa, file=hmmdata.file)
         cat("OK\n")
     }
     
+<<<<<<< HEAD
     
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
     contigLengths <- contigLengths[plot.contigs,]
 
     ## Track the width of breakpoints
@@ -368,16 +450,25 @@ for(indiv in indivs) {
 
         if (sum(names(dataa) %in% contig)!=0) {
             contig_data <- dataa[[contig]];
+<<<<<<< HEAD
             x <- contig_data$pos #a list of positions
             y <- contig_data[,paste("Pr(", ancestries, "|y)")]
 	        
+=======
+            x <- contig_data$pos
+            y <- contig_data[,paste("Pr(", ancestries, "|y)")]
+	
+>>>>>>> parent of a4e3985... updated for multiple reads
 				### divvy up homozygous and heterozygous blocks
             byBlocks <- breakpoint.width(x, y[,par1homo_col], y[,par2homo_col], indiv=indiv, contig=contig, conf1=.05 ,conf2=.95);
             if (is.null(byBlocks[["bps"]])==F) { breakpoints <- rbind(breakpoints,byBlocks[["bps"]]); }
 
+<<<<<<< HEAD
             ### Output a gff file for Geneious
             output_geneious_file(gff_thresh_conf, x, y, par1homo_col, par2homo_col, indiv, contig, contigLengths)
             
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
 				### plot
             like.par1 <- contig_data[contig_data$read_allele==contig_data$par1ref,]$pos;
             like.par2 <- contig_data[contig_data$read_allele==contig_data$par2ref,]$pos;
@@ -387,6 +478,10 @@ for(indiv in indivs) {
 				if (nrow(byBlocks[["blocks"]])>0) {
 					## plot fraction of par1/(par1+par2) among informative markers (between -1 and 1)
             	matchMismatch <- rbind(matchMismatch, reportCounts(contig_data, as.vector(byBlocks[["blocks"]][,"V1"]), as.vector(byBlocks[["blocks"]][,"V4"]), as.numeric(as.vector(byBlocks[["blocks"]][,"V7"])), as.numeric(as.vector(byBlocks[["blocks"]][,"V8"]))))
+<<<<<<< HEAD
+=======
+
+>>>>>>> parent of a4e3985... updated for multiple reads
             }
         }
 
@@ -410,4 +505,7 @@ for(indiv in indivs) {
 						append=F,quote=F,na="NA",row.names=F,col.names=T,sep=",");
    }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> parent of a4e3985... updated for multiple reads
