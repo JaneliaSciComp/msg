@@ -25,7 +25,7 @@ gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Ge
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
-one.site.per.read <- TRUE
+one.site.per.read <- FALSE
 minCoverage <- 0;
 
 contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
@@ -192,7 +192,8 @@ for(indiv in indivs) {
             data <- read.data(dir, indiv, contig)
             data$read <- factor.contiguous(data$pos)
             total_sites <- length(unique(data$read));
-            cat("\tRound 2: Total number of markers", total_sites, "\n")
+            #commented out because this is not number of markers, it is number of contiguous regions
+ #           cat("\tRound 2: Total number of markers", total_sites, "\n")
 
             ok <- !is.na(data$bad) | !is.na(data$par1ref) & !is.na(data$par2ref) & !is.na(data$cons)
             cat("\tRound 2: Removing", sum(!ok), "sites at which par1/par2/cons allele unknown\n")
