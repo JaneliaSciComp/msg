@@ -25,7 +25,7 @@ gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Ge
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
-one.site.per.read <- FALSE
+one.site.per.read <- TRUE
 minCoverage <- 0;
 
 contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
