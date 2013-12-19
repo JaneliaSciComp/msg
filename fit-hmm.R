@@ -192,7 +192,8 @@ for(indiv in indivs) {
             data <- read.data(dir, indiv, contig)
             data$read <- factor.contiguous(data$pos)
             total_sites <- length(unique(data$read));
-            cat("\tRound 2: Total number of markers", total_sites, "\n")
+            #commented out because this is not number of markers, it is number of contiguous regions
+ #           cat("\tRound 2: Total number of markers", total_sites, "\n")
 
             ok <- !is.na(data$bad) | !is.na(data$par1ref) & !is.na(data$par2ref) & !is.na(data$cons)
             cat("\tRound 2: Removing", sum(!ok), "sites at which par1/par2/cons allele unknown\n")
@@ -300,7 +301,7 @@ for(indiv in indivs) {
 				}
 						
 				for (g in 1:length(qual)) {
-					qual_corrected[g]<-qual[g]*(theta^(order(qual)[g]-1)) ## quality value correction
+					qual_corrected[g]<-qual[g]*(theta^(rank(-qual)[g]-1)) ## quality value correction
 					y[i,eps[g]] <- 10^(-(qual_corrected[g])/10)
 				}
 			}
