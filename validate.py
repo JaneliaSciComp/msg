@@ -25,7 +25,7 @@ def get_output_file_barcodes(file_path):
         if i==0:
             continue #skip header line
         #read first column, part after _
-        barcodes.add(re.split(r'\s+',line)[0].split('_')[1])
+        barcodes.add(re.split(r'\s+',line)[0].split('_')[-1])
     return barcodes
 
 def run_ls_grep(folder,pattern):
