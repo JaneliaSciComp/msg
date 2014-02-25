@@ -323,10 +323,17 @@ for(indiv in indivs) {
             attr(data, "badpos") <- badpos
             dataa[[contig]] <- data
         
+            #Also save data as CSV for other programs
+            cat("Saving contig data as CSV ...")
+            write.csv(dataa[[contig]], file=paste(hmmdata.file, "chrom", contig, "csv", sep="."))
+            cat("OK\n")
+
         }
         cat("Saving data...")
         save(dataa, file=hmmdata.file)
         cat("OK\n")
+      
+        
     }
     
     
