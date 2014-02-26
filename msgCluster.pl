@@ -230,6 +230,7 @@ if ($params{'cluster'} != 0) {
    &Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n -t 1-${num_barcodes}:1 ./msgRun2.sh");
    #&Utils::system_call("qsub -N msgRun2.$$ -hold_jid msgRun1.$$ -cwd -b y -V -sync n -t 3-${num_barcodes}:1 ./msgRun2.sh");
    &Utils::system_call("qsub -N msgRun2a.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
+   &Utils::system_call("qsub -N msgRun2b.$$ -hold_jid msgRun2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pnathresh'} -o hmm_fits_ests.csv");
    &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
    &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
@@ -246,6 +247,7 @@ if ($params{'cluster'} != 0) {
 } else { 
    &Utils::system_call("./msgRun2.sh > msgRun2.$$.out 2> msgRun2.$$.err");
    &Utils::system_call("python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
+   &Utils::system_call("python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pnathresh'} -o hmm_fits_ests.csv");
    &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
    &Utils::system_call("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation

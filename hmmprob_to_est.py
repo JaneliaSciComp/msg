@@ -143,7 +143,11 @@ def main():
     if not opts.hmm_fit_dir and opts.out_path:
         parser.error("A directory for locating hmm_fit data and output file path is required.")
 
+    print "Starting hmmprob_to_est.py with parameters:", str(opts)
+
     all_files = grab_files(opts.hmm_fit_dir)
+    print "using files:"
+    print all_files
     
     transform(all_files, opts.out_path, opts.pnathresh)
     
