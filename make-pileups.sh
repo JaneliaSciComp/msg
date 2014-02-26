@@ -56,7 +56,7 @@ for ref in $refs ; do
         echo "Making pileup for $species contig $ref"
         samtools view -bu $file-sorted.bam $ref | samtools sort - $file-$ref-sorted
         samtools index $file-$ref-sorted.bam
-        samtools pileup -cf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
+        samtools pileup -Bcf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
         rm $file-$ref-sorted.bam $file-$ref-sorted.bam.bai
     }
 done
