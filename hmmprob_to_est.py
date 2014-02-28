@@ -122,16 +122,17 @@ def transform(file_list, out_path, pnathresh):
         for d_ests in d_inds.values():
             all_positions |= set(d_ests.keys())
         all_positions = sorted(list(all_positions))
-    
-        #Write header rows
-        outcsv.writerow(['individual'] + ['%s-%s' % (chrom, v) for v in all_positions])
-        outcsv.writerow([chrom] * (1+len(all_positions)))
-        #Write data
-        for ind_name, ests_by_pos in d_inds.items():
-            outrow = [ind_name]
-            for pos in all_positions:
-                outrow.append(ests_by_pos.get(pos,'N/A'))
-            outcsv.writerow(outrow)
+        
+        if all_positions: #only include chroms with data
+            #Write header rows
+            outcsv.writerow(['individual'] + ['%s-%s' % (chrom, v) for v in all_positions])
+            outcsv.writerow([''] + ([chrom] * (1+len(all_positions))))
+            #Write data
+            for ind_name, ests_by_pos in d_inds.items():
+                outrow = [ind_name]
+                for pos in all_positions:
+                    outrow.append(ests_by_pos.get(pos,'-'))
+                outcsv.writerow(outrow)
     
     outfile.close()
     
