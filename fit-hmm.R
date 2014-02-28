@@ -22,10 +22,13 @@ rfac <- as.numeric(opts$r)
 priors <- unlist(strsplit(opts$z,split=","))
 theta <- as.numeric(opts$t)
 gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Geneious
+one_site_per_contig <- as.logical(as.numeric(opts$u))
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
-one.site.per.read <- TRUE
+one.site.per.read <- one_site_per_contig
+cat("one.site.per.read has been set to", one.site.per.read, "\n")
+
 minCoverage <- 0;
 
 contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);

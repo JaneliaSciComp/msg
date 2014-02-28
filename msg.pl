@@ -58,7 +58,8 @@ GetOptions(
     'new_parser=i' => \$new_parser,
     'new_parser_offset=i' => \$new_parser_offset,
     'new_parser_filter_out_seq=s' => \$new_parser_filter_out_seq,
-    'custom_qsub_options_for_all_cmds=s' => \$custom_qsub_options_for_all_cmds
+    'custom_qsub_options_for_all_cmds=s' => \$custom_qsub_options_for_all_cmds,
+    'one_site_per_contig=i' => \$one_site_per_contig
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -102,6 +103,7 @@ print "gff_thresh_conf $gff_thresh_conf\n\n";
 print "new_parser $new_parser\n\n";
 print "new_parser_offset $new_parser_offset\n\n";
 print "new_parser_filter_out_seq $new_parser_filter_out_seq\n\n";
+print "$one_site_per_contig $one_site_per_contig\n\n";
 #only update parentals passes this in, so you won't see it on standard msg runs:
 print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
 
@@ -422,6 +424,7 @@ if ($parse_or_map eq '--map-only') {
              '-w', $bwa_alg,
              '-e', $use_stampy,
              '-m', $gff_thresh_conf,
+             '-u', $one_site_per_contig,
    		  ) ;
 
    } close BARCODE;
