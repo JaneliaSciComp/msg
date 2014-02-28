@@ -89,6 +89,11 @@ def transform(file_list, out_path, pnathresh):
             pos, count, est = row[COL_POS], row[COL_COUNT], row[COL_EST]
             d_ests[chrom][ind_name][pos] = est
             chrom_pos_count[(chrom,pos)] = chrom_pos_count.get((chrom,pos),0) + 1
+    #
+    #debugging
+    #import pprint
+    #open('/home/pinerog/msg_work/d_ests.txt','w').write(pprint.pformat(d_ests))
+    #open('/home/pinerog/msg_work/chrom_pos_count.txt','w').write(pprint.pformat(chrom_pos_count))
 
     #Remove positions with less individuals than pna thresh %
     #(example: If pna thresh is .1, that means for a given chromosome location
@@ -99,7 +104,7 @@ def transform(file_list, out_path, pnathresh):
     print "Will throw out chrom/positions with less than %s individuals." % count_thresh
     print "(that's int(round(pna_thresh %s * %s individuals)) = %s )" % (pnathresh, num_inds, count_thresh)
 
-    for crom, d_inds in d_ests.items():
+    for chrom, d_inds in d_ests.items():
         for ind_name, ests_by_pos in d_inds.items():
             for pos in ests_by_pos.keys():
                 if chrom_pos_count[(chrom,pos)] < count_thresh:
