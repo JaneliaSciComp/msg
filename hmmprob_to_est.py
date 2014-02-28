@@ -8,11 +8,9 @@ example file name: indivH12_TTGACG-hmmprob.RData.chrom.2R.csv
 (If file name format changes, update parse_path function below)
 
 File Format Details:
-    Creates a new CSV file at out_path with a section for each chromosome.
-    Each section has one row for each individual
-    and a column for every single position on the chromosome.
+    Creates a new CSV file at out_path with one individual per row.
     Columns contain the est value for that indivdual at that position.
-    (Columns with less than pnathresh % coverage are omitted.
+    (Columns with less than pnathresh % coverage are omitted.)
     
 Usage:
 python msg/hmmprob_to_est.py -d hmm_fit -t .03 -o hmmprob_w_est.csv
@@ -45,6 +43,57 @@ def grab_files(dir):
     glob_pattern = dir.strip('/') + GLOB_PATTERN
     return glob.glob(glob_pattern)
 
+def write_csv(d_ests, out_path):
+    """ Takes a (filtered) dict (See transform function for explanation of
+    what d_ests is and an example of what it could contain.)
+    
+    Writes it out into a CSV file, putting everything together in one matrix.    
+    """
+    #Write to CSV
+    outfile = open(out_path, 'wb')
+    outcsv = csv.writer(outfile)
+
+    #Set up data to fill in, and be written to file
+    header_row, chrom_row = ['individual'],['']
+    #seed with ind names
+    csv_data = []
+    for d_inds in d_ests.values():
+        for ind_name in d_inds:
+            csv_data.append((ind_name,))
+    csv_data = sorted(list(set(csv_data)))
+    #change rows from tuples to lists
+    csv_data = [list(row) for row in csv_data]
+    print csv_data
+    #index our csv_data so we can quickly put an indivudals data in the right place
+    r = row_by_ind_name = {}
+    for i,row in enumerate(csv_data):
+        r[row[0]] = i
+
+    #fill in data
+    for chrom, d_inds in d_ests.items():
+        #Make a sorted list of all positions in this chromosome
+        all_positions = set()
+        for d_ests in d_inds.values():
+            all_positions |= set(d_ests.keys())
+        all_positions = sorted(list(all_positions))
+        
+        if all_positions: #only include chroms with data
+            #Update header rows with these positions / chomosomes
+            header_row += ['%s-%s' % (chrom, v) for v in all_positions]
+            chrom_row += ([chrom] * len(all_positions))
+
+            #Write data
+            for ind_name, ests_by_pos in d_inds.items():
+                outrow = csv_data[r[ind_name]]
+                for pos in all_positions:
+                    outrow.append(ests_by_pos.get(pos,'-'))
+    
+    outcsv.writerow(header_row)
+    outcsv.writerow(chrom_row)
+    outcsv.writerows(csv_data)
+    
+    outfile.close()
+
 def parse_path(path):
     """Get ind name, and chrom from file path"""
     dir, filename = os.path.split(path)
@@ -53,13 +102,10 @@ def parse_path(path):
     chrom = name_parts[-2]
     return ind_name, chrom
 
-def transform(file_list, out_path, pnathresh):
+def transform(file_list, pnathresh):
     """
-    Creates a new CSV file at out_path with a section for each chromosome.
-    Each section has one row for each individual
-    and a column for every single position on the chromosome.
-    Columns contain the est value for that indivdual at that position.
-    (Columns with less than pnathresh % coverage are omitted.
+    Groups position ests by individual and by chromosome and filters 
+    out positions with less than pnathresh % coverage.
     """
     
     #d_ests stores estimates by position by individual by chromosome.
@@ -89,11 +135,6 @@ def transform(file_list, out_path, pnathresh):
             pos, count, est = row[COL_POS], row[COL_COUNT], row[COL_EST]
             d_ests[chrom][ind_name][pos] = est
             chrom_pos_count[(chrom,pos)] = chrom_pos_count.get((chrom,pos),0) + 1
-    #
-    #debugging
-    #import pprint
-    #open('/home/pinerog/msg_work/d_ests.txt','w').write(pprint.pformat(d_ests))
-    #open('/home/pinerog/msg_work/chrom_pos_count.txt','w').write(pprint.pformat(chrom_pos_count))
 
     #Remove positions with less individuals than pna thresh %
     #(example: If pna thresh is .1, that means for a given chromosome location
@@ -109,32 +150,7 @@ def transform(file_list, out_path, pnathresh):
             for pos in ests_by_pos.keys():
                 if chrom_pos_count[(chrom,pos)] < count_thresh:
                     del d_ests[chrom][ind_name][pos]                    
-                    #print "Removed chrom %s position %s for individual %s " \
-                    #    "because it was only seen in %s individuals." % (chrom, pos, ind_name, chrom_pos_count[(chrom,pos)])
-
-    #Write to CSV
-    outfile = open(out_path, 'wb')
-    outcsv = csv.writer(outfile)
-
-    for chrom, d_inds in d_ests.items():
-        #Make a sorted list of all positions
-        all_positions = set()
-        for d_ests in d_inds.values():
-            all_positions |= set(d_ests.keys())
-        all_positions = sorted(list(all_positions))
-        
-        if all_positions: #only include chroms with data
-            #Write header rows
-            outcsv.writerow(['individual'] + ['%s-%s' % (chrom, v) for v in all_positions])
-            outcsv.writerow([''] + ([chrom] * (1+len(all_positions))))
-            #Write data
-            for ind_name, ests_by_pos in d_inds.items():
-                outrow = [ind_name]
-                for pos in all_positions:
-                    outrow.append(ests_by_pos.get(pos,'-'))
-                outcsv.writerow(outrow)
-    
-    outfile.close()
+    return d_ests
     
 def main():
     """Parse command line args, and call appropriate functions."""
@@ -150,12 +166,10 @@ def main():
         parser.error("A directory for locating hmm_fit data and output file path is required.")
 
     print "Starting hmmprob_to_est.py with parameters:", str(opts)
-
     all_files = grab_files(opts.hmm_fit_dir)
-    print "using files:"
-    print all_files
-    
-    transform(all_files, opts.out_path, opts.pnathresh)
+    print "Found %s files" % len(all_files)
+    d_ests = transform(all_files, opts.pnathresh)
+    write_csv(d_ests, opts.out_path)
     
 if __name__=='__main__':
     main()
