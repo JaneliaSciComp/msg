@@ -22,6 +22,8 @@ import csv
 import glob
 import optparse
 
+from msglib import trace, get_free_memory
+
 # -------------- SETTINGS ----------------
 
 # Assumes the files matches this pattern relative to hmm_fit (or other specificied directory)
@@ -43,6 +45,7 @@ def grab_files(dir):
     glob_pattern = dir.strip('/') + GLOB_PATTERN
     return glob.glob(glob_pattern)
 
+@trace
 def write_csv(d_ests, out_path):
     """ Takes a (filtered) dict (See transform function for explanation of
     what d_ests is and an example of what it could contain.)
@@ -54,17 +57,19 @@ def write_csv(d_ests, out_path):
     outcsv = csv.writer(outfile)
 
     #Set up data to fill in, and be written to file
-    header_row, chrom_row = ['individual'],['']
-    #seed with ind names
+    #Header rows:
+    header_row, chrom_row, gen_map_pos_row = ['individual'],[''],['']
+    #seed with ind names (Make first column of each data row hold the ind name.)
     csv_data = []
     for d_inds in d_ests.values():
         for ind_name in d_inds:
             csv_data.append((ind_name,))
+    #Sort and make sure there are no duplicates
     csv_data = sorted(list(set(csv_data)))
     #change rows from tuples to lists
     csv_data = [list(row) for row in csv_data]
-    print csv_data
-    #index our csv_data so we can quickly put an indivudals data in the right place
+    #print csv_data
+    #build an index of our csv_data so we can quickly put an indivudals data in the right place
     r = row_by_ind_name = {}
     for i,row in enumerate(csv_data):
         r[row[0]] = i
@@ -81,8 +86,9 @@ def write_csv(d_ests, out_path):
             #Update header rows with these positions / chomosomes
             header_row += ['%s-%s' % (chrom, v) for v in all_positions]
             chrom_row += ([chrom] * len(all_positions))
+            gen_map_pos_row += [i+1 for i in range(len(all_positions))]
 
-            #Write data
+            #Store actual data to be written
             for ind_name, ests_by_pos in d_inds.items():
                 outrow = csv_data[r[ind_name]]
                 for pos in all_positions:
@@ -90,8 +96,9 @@ def write_csv(d_ests, out_path):
     
     outcsv.writerow(header_row)
     outcsv.writerow(chrom_row)
+    outcsv.writerow(gen_map_pos_row)
     outcsv.writerows(csv_data)
-    
+    print "Free memory after writing CSV is %s MB" % get_free_memory()
     outfile.close()
 
 def parse_path(path):
@@ -102,6 +109,7 @@ def parse_path(path):
     chrom = name_parts[-2]
     return ind_name, chrom
 
+@trace
 def transform(file_list, pnathresh):
     """
     Groups position ests by individual and by chromosome and filters 
@@ -136,6 +144,8 @@ def transform(file_list, pnathresh):
             d_ests[chrom][ind_name][pos] = est
             chrom_pos_count[(chrom,pos)] = chrom_pos_count.get((chrom,pos),0) + 1
 
+    print "(mid transform function) Free memory now is %s MB" % get_free_memory()
+
     #Remove positions with less individuals than pna thresh %
     #(example: If pna thresh is .1, that means for a given chromosome location
     #we'd throw out the whole position if it exists for less than 10% of individuals)
@@ -149,9 +159,10 @@ def transform(file_list, pnathresh):
         for ind_name, ests_by_pos in d_inds.items():
             for pos in ests_by_pos.keys():
                 if chrom_pos_count[(chrom,pos)] < count_thresh:
-                    del d_ests[chrom][ind_name][pos]                    
+                    del d_ests[chrom][ind_name][pos]                
     return d_ests
-    
+
+@trace
 def main():
     """Parse command line args, and call appropriate functions."""
     usage="""\nusage: %prog [options]\n"""
@@ -166,9 +177,11 @@ def main():
         parser.error("A directory for locating hmm_fit data and output file path is required.")
 
     print "Starting hmmprob_to_est.py with parameters:", str(opts)
+    print "Free memory is %s MB" % get_free_memory()
     all_files = grab_files(opts.hmm_fit_dir)
     print "Found %s files" % len(all_files)
     d_ests = transform(all_files, opts.pnathresh)
+    print "Free memory now is %s MB" % get_free_memory()
     write_csv(d_ests, opts.out_path)
     
 if __name__=='__main__':
