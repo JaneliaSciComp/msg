@@ -178,6 +178,7 @@ if ($params{'cluster'} != 0) {
         ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
         ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
         ' --one_site_per_contig ' . $params{'one_site_per_contig'} .
+        ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null') .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
@@ -210,7 +211,8 @@ if ($params{'cluster'} != 0) {
         ' --linker_system ' . $params{'linker_system'} .
         ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
         ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-        ' --one_site_per_contig ' . $params{'one_site_per_contig'} .        
+        ' --one_site_per_contig ' . $params{'one_site_per_contig'} .
+        ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null') .        
        "\n";
     }
 close OUT;
