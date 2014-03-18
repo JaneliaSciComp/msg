@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:r:t:h:w:e:m:u:" opt
+while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:" opt
 do 
   case $opt in
       b) barcodes=$OPTARG ;;
@@ -28,6 +28,7 @@ do
       f) deltapar1=$OPTARG ;;
       g) deltapar2=$OPTARG ;;
       z) priors=$OPTARG ;;
+      a) recRate=$OPTARG ;;      
       r) rfac=$OPTARG ;;
       t) theta=$OPTARG ;;
       w) bwaalg=$OPTARG ;;
@@ -45,6 +46,7 @@ shift $(($OPTIND - 1))
 
 [ -n "$deltapar1" ] || deltapar1=.01
 [ -n "$deltapar2" ] || deltapar2=$deltapar1
+[ -n "$recRate" ] ||   recRate=0
 [ -n "$rfac" ] ||      rfac=.000001
 
 date
@@ -56,7 +58,7 @@ sex=$(perl -ne "print if /[ACGT]+\t$plate\t/" $barcodes | cut -f4)
 
 echo ; echo ; echo "---------------------------------------------------------------------" ; echo
 
-echo "Processing INDIVIDUAL $indiv PLATE $plate SEX $sex DELTA $deltapar1,$deltapar2 RFAC $rfac"
+echo "Processing INDIVIDUAL $indiv PLATE $plate SEX $sex DELTA $deltapar1,$deltapar2 RECRATE $recRate RFAC $rfac"
 
 indivdir=$outdir/$indiv
 [ -d $indivdir ] || mkdir -p $indivdir
@@ -88,7 +90,7 @@ $cmd || {
 echo "Fitting HMM for $indiv"
 Rindivdir=$Routdir/$indiv
 [ -d $Rindivdir ] || mkdir -p $Rindivdir
-cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta -g $gff_thresh_conf -u $one_site_per_contig"
+cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -a $recRate -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta -g $gff_thresh_conf -u $one_site_per_contig"
 
 exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
 echo $cmd

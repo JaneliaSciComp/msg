@@ -23,6 +23,7 @@ priors <- unlist(strsplit(opts$z,split=","))
 theta <- as.numeric(opts$t)
 gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Geneious
 one_site_per_contig <- as.logical(as.numeric(opts$u))
+recrate <- as.numeric(opts$a)
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -245,12 +246,19 @@ for(indiv in indivs) {
             K <- length(ancestries)
 
             ## Transition probabilities
-            if(contig %in% main.contigs) {
-                r <- 1 / contigLengths[contig,"length"]
-				} else {
-                cat("\tContig ", contig, " not found in main.contigs - defaulting to contig length of ", contigLengths[1,"chr"], "\n")
-                r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
-				}
+            
+            #Setting r (recrate)
+            if (recrate == 0) {
+                if(contig %in% main.contigs) {
+                    r <- 1 / contigLengths[contig,"length"]
+                    } else {
+                    cat("\tContig ", contig, " not found in main.contigs - defaulting to contig length of ", contigLengths[1,"chr"], "\n")
+                    r <- 1 / contigLengths[1,"length"] ## Arbitrarily use the first contig for unassembled contigs
+                    }
+            }
+            else {
+                r <- recrate / sum(contigLengths[,"length"])
+                }
 
             d <- c(NA, diff(data$pos))
             p <- 1 - exp(-r*d*rfac)
