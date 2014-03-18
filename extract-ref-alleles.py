@@ -17,9 +17,11 @@ import gzip
 
 ##### INTERNAL OPTIONS (for developers) ######
 
-#How much memory to keep free in mB.  This leaves some buffer in case other
-#jobs get allocated to the same node while this program is running.
-KEEP_MEM_FREE_AMT = 800
+#How much memory to keep free in mB.  This leaves some buffer for system memory
+#or in case other jobs get allocated to the same node while this program is running.
+#Future:
+#It might be worth making this a percentage of total memory like max(5% of total, 1000mb).
+KEEP_MEM_FREE_AMT = 1200
 
 ##############################################
 
@@ -70,49 +72,66 @@ class App(CommandLineApp):
         once in either file."""   
         sim_removed_count, sec_removed_count = 0,0
         sim_reads, sec_reads = dict(), dict()
+
         sim_samfile_in = self.open_as_pysam(sim_samfilepath)
-        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
-        sim_orig_header = sim_samfile_in.header
-        sec_orig_header = sec_samfile_in.header
-        
         for read in sim_samfile_in.fetch():
             sim_reads[read.qname] = sim_reads.setdefault(read.qname,0) + 1
+        #Close and later re-open input files to save memory and because I don't
+        #seem to have access to the seek method in the pysam files to reset the fetch.
+        sim_samfile_in.close()
+        del sim_samfile_in
+        gc.collect()
+                                
+        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
         for read in sec_samfile_in.fetch():
             sec_reads[read.qname] = sec_reads.setdefault(read.qname,0) + 1
+        sec_samfile_in.close()
+        del sec_samfile_in
+        gc.collect()
+            
         both = set(sim_reads.keys()).intersection(set(sec_reads.keys()))
         print "Found %s reads in sim file" % len(sim_reads)
         print "Found %s reads in sec file" % len(sec_reads)
         print "Found %s reads common to both files" % len(both)
 
         #write out only those in both
+
+        sim_samfile_in = self.open_as_pysam(sim_samfilepath)
+        sim_orig_header = sim_samfile_in.header
         out_sim_samfilepath = sim_samfilepath + '.noncommon.reads.removed.sam'
-        out_sec_samfilepath = sec_samfilepath + '.noncommon.reads.removed.sam'
         sim_outfile = pysam.Samfile(out_sim_samfilepath, 'wh', template=sim_samfile_in,
             header=sim_orig_header)
-        sec_outfile = pysam.Samfile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
-            header=sec_orig_header)
-
-        #Close and re-open input files because I don't seem to have access to the seek 
-        #method in the pysam files to reset the fetch.
-        sim_samfile_in.close()
-        sec_samfile_in.close()
-        sim_samfile_in = self.open_as_pysam(sim_samfilepath)
-        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
-
         for read in sim_samfile_in.fetch():
             if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
                 sim_outfile.write(read)
             else:
                 sim_removed_count +=1
+        sim_samfile_in.close()
+        del sim_samfile_in
+        sim_outfile.close()
+        del sim_outfile
+        gc.collect()
+
+        sec_samfile_in = self.open_as_pysam(sec_samfilepath)
+        sec_orig_header = sec_samfile_in.header
+        out_sec_samfilepath = sec_samfilepath + '.noncommon.reads.removed.sam'
+        sec_outfile = pysam.Samfile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
+            header=sec_orig_header)
         for read in sec_samfile_in.fetch():
             if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
                 sec_outfile.write(read)
             else:
-                sec_removed_count +=1
+                sec_removed_count +=1       
+        sec_samfile_in.close()
+        del sec_samfile_in
+        sec_outfile.close()
+        del sec_outfile
+        del both
+        del sec_reads
+        del sim_reads
+        gc.collect()
         
         print "Removed %s simulans reads and %s seculans reads" % (sim_removed_count, sec_removed_count)
-        sim_outfile.close()
-        sec_outfile.close()
         
         #Don't delete original since it would prevent us from re-running
         #if delete_original_files:
