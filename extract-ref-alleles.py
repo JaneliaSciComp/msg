@@ -17,11 +17,11 @@ import gzip
 
 ##### INTERNAL OPTIONS (for developers) ######
 
-#How much memory to keep free in mB.  This leaves some buffer for system memory
-#or in case other jobs get allocated to the same node while this program is running.
-#Future:
-#It might be worth making this a percentage of total memory like max(5% of total, 1000mb).
-KEEP_MEM_FREE_AMT = 1200
+# When true this causes program to periodically offload parts of the data structure
+# to disk to keep memory usage lower.  This actually runs slightly faster too.
+CONSERVE_MEMORY = True
+# How often to offload data structure to disk.  (ignored is CONSERVE_MEMORY is False)
+OFFLOAD_MEM_EVERY_N_READS = 5000
 
 ##############################################
 
@@ -144,7 +144,7 @@ class App(CommandLineApp):
     def main(self):
 
         print "\n",get_free_memory(), "mB of free memory at program start"
-        print "(Keeping %s mB of memory in reserve for other programs)" % KEEP_MEM_FREE_AMT
+        print "Conversing Memory mode: %s" % str(CONSERVE_MEMORY)
 
         #Clear out refs dir if it exists, create it if it doesn't
         #(It's important to delete any existing files because we open them to write
@@ -225,7 +225,6 @@ class App(CommandLineApp):
         chroms = self.options.chroms
         verbosity = self.options.verbosity
         omit_flags = set([0,16]) #I believe these are actually "don't omit" flags
-        memory_reserve = KEEP_MEM_FREE_AMT
         need_sort_and_dedupe = False
         bwa_alg = self.options.bwa_alg.lower()
         use_stampy = self.options.use_stampy
@@ -304,15 +303,15 @@ class App(CommandLineApp):
                     par2ref['par1'], par2ref['par2'], 
                     verbosity)
   
-            if (not i % 1e4):
+            if (not i % OFFLOAD_MEM_EVERY_N_READS):
                 #print "At ref num %s. free memory is %s mB" % (i, get_free_memory())
-                if (get_free_memory() < memory_reserve):
+                if CONSERVE_MEMORY:
                     #Every 1e4 references check if we are low on memory and if so
                     #offload references calculated so far to the output files
                     #so we can clear them from memory.  We'll sort and dedupe them 
                     #at the end.
-                    print "No free memory left: %s mB (%s mB is being kept in reserve)." % (get_free_memory(),memory_reserve)
                     print "Offloading refs/orths to files to limit further memory usage."
+                    print "free memory left: %s mB." % get_free_memory()
                     need_sort_and_dedupe = True
                     self.store_and_remove_alleles_orths(refsp, refs, orths, False)
         print '\n'
