@@ -24,6 +24,7 @@ theta <- as.numeric(opts$t)
 gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Geneious
 one_site_per_contig <- as.logical(as.numeric(opts$u))
 recrate <- as.numeric(opts$a)
+# pepthresh <- opts$j
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
@@ -335,9 +336,11 @@ for(indiv in indivs) {
             dataa[[contig]] <- data
         
             #Also save data as CSV for other programs
-            cat("Saving contig data as CSV ...")
-            write.csv(dataa[[contig]], file=paste(hmmdata.file, "chrom", contig, "csv", sep="."))
-            cat("OK\n")
+            if(opts$j != "null") {
+                cat("Saving contig data as CSV ...")
+                write.csv(dataa[[contig]], file=paste(hmmdata.file, "chrom", contig, "csv", sep="."))
+                cat("OK\n")
+            }
 
         }
         cat("Saving data...")
