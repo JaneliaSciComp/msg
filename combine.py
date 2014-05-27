@@ -15,12 +15,11 @@ import csv
 import glob
 import optparse
 import subprocess
+import uuid
+import gc
 
 import numpy
 import numpy.lib.recfunctions
-#import rpy2.robjects as robjects
-#robjects.r['load'](".RData")
-#robjects.r['y']
 
 from msglib import trace, get_free_memory
 
@@ -29,7 +28,7 @@ from msglib import trace, get_free_memory
 
 # Assumes the files matches this pattern relative to hmm_fit (or other specificied directory)
 GLOB_PATTERN = '/*/*-hmmprob.RData'
-
+DEBUG = True 
 
 # ----------------------------------------
 
@@ -40,7 +39,9 @@ def grab_files(dir):
     'hmm_fit/indivG7_CTTGCG/indivG7_CTTGCG-hmmprob.RData.chrom.2R.csv', ...]
     """
     glob_pattern = dir.rstrip('/') + GLOB_PATTERN
-    return glob.glob(glob_pattern)
+    files = glob.glob(glob_pattern)
+    print "found %s input files" % len(files)
+    return files
 
 def parse_path(path):
     """Get ind name, and chrom from file path"""
@@ -67,8 +68,8 @@ resave <- function(file){
   objs <- ls(envir = e, all.names = TRUE)
   for(obj in objs) {
     .x <- get(obj, envir =e)
-    cat(sprintf('%%s.tsv\n', obj) )
-    write.table( .x, file=paste(obj, ".tsv", sep=""), sep="\t", col.names = NA,
+    cat(sprintf('%s%%s.tsv\n', obj) )
+    write.table( .x, file=paste("%s", obj, ".tsv", sep=""), sep="\t", col.names = NA,
             qmethod = "double")    
   }
 }
@@ -80,17 +81,18 @@ resave <- function(file){
   load(file, envir = e)
   obj <- get('%s', envir =e)
   lapply( names(obj), function(nam) {
-    write.table( obj[[nam]], file=paste(nam, ".tsv", sep=""), sep="\t", col.names = NA,
+    write.table( obj[[nam]], file=paste("%s", nam, ".tsv", sep=""), sep="\t", col.names = NA,
             qmethod = "double")
-    cat(sprintf('%%s.tsv\n', nam) )
+    cat(sprintf('%s%%s.tsv\n', nam) )
     }
    )
 }
 resave('%s')"""
+    files_prefix = 'temp-' + str(uuid.uuid4())
     if target_object:
-        r_code = highly_targeted_r_code % (target_object, rdata_file_path)
+        r_code = highly_targeted_r_code % (target_object, files_prefix, files_prefix, rdata_file_path)
     else:
-        r_code = generic_r_code % (rdata_file_path)
+        r_code = generic_r_code % (files_prefix, files_prefix, rdata_file_path)
     #print r_code
     command = ["Rscript","-","-"] #"-" to tell Rscript to use pipes for input and output
     #print ' '.join(command)
@@ -103,9 +105,10 @@ resave('%s')"""
             #for comments in our data file
             array = numpy.loadtxt(csv_path, skiprows=1, usecols=(1,21,23), delimiter="\t",
                 comments="wewillneverseethisstringinafile15",
-                dtype={'names': ('pos', indiv+'-par1', indiv+'-par2'), 'formats': ('a100', 'f8', 'f8')})
+                dtype={'names': ('pos', 'par1', 'par2'), 'formats': ('a100', 'f8', 'f8')}
+                )
             os.remove(csv_path)
-            yield array, indiv, csv_path.strip('.tsv')
+            yield array, indiv, csv_path.replace(files_prefix,'').strip('.tsv')
 
 def input_data_sets(dir):
     for path in grab_files(dir):
@@ -115,44 +118,111 @@ def input_data_sets(dir):
 @trace
 def merge(dir):
     """
-    This is my attempt at using numpy for the join, Ultimately it seemed to insist on
-    creating new columns even if the field names were the same.
-    Here's some discussion on the issues:
-    http://stackoverflow.com/questions/23500754/numpy-how-to-outer-join-arrays
-
-    array will look like this:
-    
-array([('2:6506', 4.6725971801473496e-25, 0.99999999995088695),
-       ('2:6601', 2.2452745388799898e-27, 0.99999999995270605),
-       ('2:21801', 1.9849650921836601e-31, 0.99999999997999001), ...,
-       ('2:45164194', 1.0413482803123399e-24, 0.99999999997453404),
-       ('2:45164198', 1.09470356446595e-24, 0.99999999997635303),
-       ('2:45164519', 3.7521365799080699e-24, 0.99999999997453404)], 
-      dtype=[('pos', '|S100'), ('indiv8.3.1_4_tatccTCAAGCCTCCTCGCACtga-par1', '<f8'), ('indiv8.3.1_4_tatccTCAAGCCTCCTCGCACtga-par2', '<f8')])
-
+    Combine all individuals and datapoints with one row per individual, with columns
+    being chrom:position.  Interpolate missing values in some cases.  (The R code
+    that we're trying to replicate was funny with this so there are a few special cases,
+    see code)
+    Write out one tsv file for each parent.
     """
-    final_array = None
     
+    #Combine all individuals/positions into a big dictionary (think of it like a sparse table)
+    #for each parent
+    dp1, dp2 = {}, {}
     for (array, ind, chrom) in input_data_sets(dir):
-        #Put chrom in pos
-        array['pos'] = [''.join((chrom,':',x)) for x in array['pos']]
         print ind, chrom, len(array), "records"
-        
-        if final_array is None:
-            final_array = array
-            continue
-            
-        final_array = numpy.lib.recfunctions.join_by('pos', final_array, array, jointype='outer',
-            r1postfix='', r2postfix='')
-    final_array.fill_value = numpy.NaN
-    final_array = final_array.filled()
+        for x in array:
+            key = (ind, chrom, int(x['pos']))
+            dp1[key] = x['par1']
+            dp2[key] = x['par2']
 
-    #TODO: separate out par1, par2, transpose final_array and write out to file
+    gc.collect()
+    print "Done loading rdata files."
+    print "Free memory is %s MB" % get_free_memory()    
 
+    #write out to files and interpolate as we go.  The R code we're replacing had some weird special cases so look out for those.
+    for (fname, dp) in (('ancestry-probs-par1.tsv',dp1),('ancestry-probs-par2.tsv',dp2)):
+        if DEBUG:
+            fname = 'test.' + fname
+        print "Compiling data for file",fname
+        #Get all positions (chrom,pos) sorted by chrom, then by position
+        positions = sorted(set([(k[1],k[2]) for k in dp.keys()]))
+        header = [''] + [''.join((p[0],':',str(p[1]))) for p in positions]
+        #Get all individuals, sorted
+        inds = sorted(set([k[0] for k in dp.keys()]))
+        #Build up each row to be written to the file (all individuals x all positions)
+        outrows = []
+        for ind in inds:
+            print "    ",ind
+            #initialize/clear out bookkeeping variables
+            last_pos_w_val, last_val, last_chrom, to_interpolate = None, None, None, []
+
+            outrow = [ind] #first column is individual name
+            for (chrom,pos) in positions:
+                
+                # Handle switching to new chromosome
+                if chrom != last_chrom:
+                    #set any positions waiting for interpolation to 0 since we've reached the end of the chrom
+                    #however we wan't to leave as NA and not interpolate between last_pos_w_val and end of chrom
+                    #because that's what R did.
+                    for (update_pos, insert_loc) in to_interpolate:
+                        if update_pos < last_pos_w_val:
+                            outrow[insert_loc] = "0"
+                    #clear out bookkeeping vars on new chrom
+                    last_pos_w_val, last_val, last_chrom, to_interpolate = None, None, None, []
+
+                key = (ind,chrom,pos)
+                if (key in dp) and ((dp[key]>.0000005) or (last_val and last_val >.0000005)):
+                    # This condition is checking if A. data exists for this position and it's non-zero OR B. data exists and the last value seen was non-zero.
+                    # These are cases were we want to use this value and last seen value to interpolate positions in the interpolation queue.
+                    
+                    # Store value in outrow to be written to file
+                    outrow.append("%.6f" % round(dp[key],6))
+                    #interpolate any positions waiting for a new value
+                    for (update_pos, insert_loc) in to_interpolate:
+                        if update_pos < last_pos_w_val:
+                            outrow[insert_loc] = "0" # zero out any pending positions before the last value we saw since this is what R did.
+                        else:
+                            insert_val = last_val + ((dp[key] - last_val) * (float(update_pos - last_pos_w_val) / (pos - last_pos_w_val)))
+                            outrow[insert_loc] = "%.6f" % round(insert_val,6)
+                    to_interpolate = [] #since all pending positions have been interpolated, clear this out
+                    last_pos_w_val, last_val = pos, dp[key]
+                elif last_val and not (key in dp):
+                    #If a value has been seen for this chrom, we'll want to start interpolating
+                    #Add a placeholder to outrow
+                    outrow.append('NA') #
+                    #Mark position for later interpolation
+                    to_interpolate.append((pos, len(outrow) - 1))
+                else:
+                    #don't interpolate
+                    if key in dp:
+                        #data exists for key but it's 0, Store value in outrow, but update bookkeeping vars
+                        outrow.append("%.6f" % round(dp[key],6)) #should be 0
+                        #still count 0 as a last value for interpolation
+                        last_pos_w_val, last_val = pos, dp[key]
+                    else:
+                        outrow.append('NA')
+                last_chrom = chrom
+
+            #set any positions waiting for interpolation to 0 since we've reached the end of the individual
+            #however we wan't to leave as NA and not interpolate between last_pos_w_val and end
+            #because that's what R did.
+            for (update_pos, insert_loc) in to_interpolate:
+                if update_pos < last_pos_w_val:
+                    outrow[insert_loc] = "0"
+
+            outrows.append(outrow)
+        print "Writing file",fname
+        csvout = csv.writer(open(fname,'wb'), delimiter='\t', quoting=csv.QUOTE_MINIMAL)
+        csvout.writerow(header)
+        csvout.writerows(outrows)
+        gc.collect()
 
 @trace
 def main():
     """Parse command line args, and call appropriate functions."""
+    #disable garbage collection for a 10% speed boost
+    gc.disable()
+    
     usage="""\nusage: %prog [options]\n"""
     parser = optparse.OptionParser(usage=usage)
     #Other option types are int and float, string is default.
@@ -171,3 +241,4 @@ def main():
     
 if __name__=='__main__':
     main()
+    
