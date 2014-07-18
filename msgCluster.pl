@@ -241,7 +241,10 @@ if ($params{'cluster'} != 0) {
    if ($params{'pepthresh'} ne '') {
        &Utils::system_call("qsub -N msgRun2b.$$ -hold_jid msgRun2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv");
    }
+   &Utils::system_call("qsub -N msgRun2b.$$ -hold_jid msgRun2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv");
+   #Temporarily include summaryPlots.R AND combine.py.  Once we know combine.py is working properly, remove summaryPlots.R
    &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   &Utils::system_call("qsub -N msgRun3b.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/combine.py -d hmm_fit");
    &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
    &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'}");
