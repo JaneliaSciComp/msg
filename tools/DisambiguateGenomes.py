@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# Specify two input genomes in fast format. Genomes must have the same 
+# number of chromosomes with the same number of bp in each chromosome.
+# Output is disambiguated genome.
+
 # Dependencies (Note, these are not included in msg dependencies.):
 # numpy (http://www.numpy.org/)
 # pyfasta (https://pypi.python.org/pypi/pyfasta/)
