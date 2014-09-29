@@ -28,7 +28,7 @@ sub system_call {
 
 sub test_dependencies {
     # Make sure all required dependencies are installed
-    system_call("bash print_dependencies.sh | tee dependencies.out");
+    system_call("bash msg/print_dependencies.sh | tee dependencies.out");
     my $last_path = getcwd();
     chdir('msg') or die "$!";
     #system_call("chmod 755 test_dependencies.sh");
