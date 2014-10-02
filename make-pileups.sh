@@ -38,7 +38,7 @@ species=par1
 [ -e $parent1 ] || die "$parent1 doesn't exist"
 
 #[ $all ] && refs=$(ls $dir/refs/par1/*-ref.alleles | perl -pe 's/-ref.alleles//' | sed -n "${range}p") || \
-[ $all ] && refs=$(ls $dir/refs/par1 | grep -F '-ref.alleles' | perl -pe 's/-ref.alleles//' | sed -n "${range}p") || \
+[ $all ] && refs=$(ls $dir/refs/par1 | grep '\-ref.alleles' | perl -pe 's/-ref.alleles//' | sed -n "${range}p") || \
     refs="4 X 3L 3R 2L 2R"
 
 file=$dir/aln_${indiv}_${species}-filtered
