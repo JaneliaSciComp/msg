@@ -63,7 +63,7 @@ species <- c("par1", "par2")
 pupsp <- "par1"
 allele.states <- c("A","C","G","T","N")
 if(opts$c == "all") {
-    contigs <- system(sprintf("ls %s/refs/par1  | grep -F '-ref.alleles' | perl -pe 's/-ref.alleles//'", dir), intern=TRUE)
+    contigs <- system(sprintf("ls %s/refs/par1  | grep '\-ref.alleles' | perl -pe 's/-ref.alleles//'", dir), intern=TRUE)
 } else {
     contigs <- unlist(strsplit(opts$c,split=",")); ## "__CONTIG__"
 }
