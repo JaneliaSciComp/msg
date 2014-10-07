@@ -1,0 +1,27 @@
+StarCluster is a platform to set up a SGE instance on Amazon web services.
+
+To set up MSG on StarCluster, I followed the instructions here to create a new customized Ubuntu 12 based 64 bit AMI: http://star.mit.edu/cluster/docs/latest/manual/create_new_ami.html
+On the AMI I saved host_setup.sh to /usr/local and ran it with these arguments to install MSG and all of its dependencies:
+bash /usr/local/host_setup.sh /usr/local/bin /usr/local
+
+This install all MSG dependencies directly in /usr/local/bin which will already be on the $PATH for all potential users.  And it installed the latest version of MSG to /usr/local/msg.
+
+I saved the AMI following the instructions in the webpage mentioned above and made the AMI public.
+
+I modified my local .starcluster/config file to reference the new AMI id and launched StarCluster.
+
+Other Notes:
+
+Doing a test run:
+mkdir /home/sgeadmin/MSG_test; cd /home/sgeadmin/MSG_test; ln -s /usr/local/msg; cp /usr/local/msg/example_MSG_toy/* .
+perl msg/msgUpdateParentals.pl
+perl msg/msgCluster.pl
+
+Updating AMI (I haven't tried this yet but these should be the basic steps):
+Follow instructions in above mentioned webpage using the current AMI as the BASE-AMI-ID.
+SSH in and make updates.
+Save as new EBS based AMI.
+Delete old AMI.
+Update docs to reference new AMI (or change name and ID of new AMI to match the old, deleted one)
+
+
