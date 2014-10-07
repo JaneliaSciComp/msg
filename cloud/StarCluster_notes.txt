@@ -4,7 +4,7 @@ To set up MSG on StarCluster, I followed the instructions here to create a new c
 On the AMI I saved host_setup.sh to /usr/local and ran it with these arguments to install MSG and all of its dependencies:
 bash /usr/local/host_setup.sh /usr/local/bin /usr/local
 
-This install all MSG dependencies directly in /usr/local/bin which will already be on the $PATH for all potential users.  And it installed the latest version of MSG to /usr/local/msg.
+This installs all MSG dependencies directly in /usr/local/bin which will already be on the $PATH for all potential users.  And it installed the latest version of MSG to /usr/local/msg.
 
 I saved the AMI following the instructions in the webpage mentioned above and made the AMI public.
 
