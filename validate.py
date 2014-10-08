@@ -10,8 +10,8 @@ import sys
 import re
 from subprocess import Popen, PIPE
 
-FILES_TO_VALIDATE = ('ancestry-probs-par1.tsv', 'ancestry-probs-par1par2.tsv',
-        'ancestry-probs-par2.tsv');
+FILES_TO_VALIDATE = ['ancestry-probs-par1.tsv', 'ancestry-probs-par1par2.tsv',
+        'ancestry-probs-par2.tsv'];
 #We should see all barcodes when we grep for these patterns in the specified folders
 FOLDERS_PATTERNS = {
     'hmm_data':('hmmdata','pileup'),
@@ -61,9 +61,12 @@ def verify_all_barcodes_got_important_files(barcodes):
                     err_msg = "File mentioned in this line is unexpectedly small: " + line
                     sys.stderr.write(err_msg + '\n')
 
-def validate_output_files(barcode_files_path):
+def validate_output_files(barcode_files_path, full_summary_plots):
     barcodes = set([re.split(r'\s+',line)[0] for line in open(barcode_files_path)])
     #print barcodes
+    if int(full_summary_plots)==0:
+        FILES_TO_VALIDATE.remove('ancestry-probs-par1par2.tsv')
+    
     for output_file_path in FILES_TO_VALIDATE:
         output_barcodes = get_output_file_barcodes(output_file_path)
         #print output_barcodes
@@ -78,8 +81,9 @@ def validate_output_files(barcode_files_path):
         else:
             pass
     verify_all_barcodes_got_important_files(barcodes)
-    verify_hmm_fit_images()
+    if int(full_summary_plots):
+        verify_hmm_fit_images()
     
 if __name__ == '__main__':
-    sys.exit(validate_output_files(sys.argv[1]))
+    sys.exit(validate_output_files(sys.argv[1], sys.argv[2]))
 

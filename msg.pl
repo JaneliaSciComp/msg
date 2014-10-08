@@ -62,6 +62,7 @@ GetOptions(
     'custom_qsub_options_for_all_cmds=s' => \$custom_qsub_options_for_all_cmds,
     'one_site_per_contig=i' => \$one_site_per_contig,
     'pepthresh=s' => \$pepthresh,
+    'max_mapped_reads=s' => \$max_mapped_reads,
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -107,6 +108,7 @@ print "new_parser_offset $new_parser_offset\n\n";
 print "new_parser_filter_out_seq $new_parser_filter_out_seq\n\n";
 print "one_site_per_contig $one_site_per_contig\n\n";
 print "pepthresh $pepthresh\n\n";
+print "max_mapped_reads $max_mapped_reads\n\n";
 #only update parentals passes this in, so you won't see it on standard msg runs:
 print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
 
@@ -430,6 +432,7 @@ if ($parse_or_map eq '--map-only') {
              '-m', $gff_thresh_conf,
              '-u', $one_site_per_contig,
              '-j', $pepthresh,
+             '-n', $max_mapped_reads,
    		  ) ;
 
    } close BARCODE;

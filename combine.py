@@ -28,7 +28,7 @@ from msglib import trace, get_free_memory
 
 # Assumes the files matches this pattern relative to hmm_fit (or other specificied directory)
 GLOB_PATTERN = '/*/*-hmmprob.RData'
-DEBUG = True 
+DEBUG = False
 
 # ----------------------------------------
 
@@ -114,6 +114,16 @@ def input_data_sets(dir):
     for path in grab_files(dir):
         for (array, ind, chrom) in rdata_to_numpy_arrays(path, target_object = 'dataa'):
             yield array, ind, chrom
+
+@trace
+def fix_values(outrows):
+    """Replace 1.000000 with 1 and 0.000000 with 0 to save space."""
+    for row in outrows:
+        for i, val in enumerate(row):
+            if val == '1.000000':
+                row[i] = '1'
+            elif val == '0.000000':
+                row[i] = '0'
 
 @trace
 def merge(dir):
@@ -211,6 +221,9 @@ def merge(dir):
                     outrow[insert_loc] = "0"
 
             outrows.append(outrow)
+
+        fix_values(outrows)
+            
         print "Writing file",fname
         csvout = csv.writer(open(fname,'wb'), delimiter='\t', quoting=csv.QUOTE_MINIMAL)
         csvout.writerow(header)

@@ -57,7 +57,9 @@ my %default_params = (
         new_parser_offset => '0',
         new_parser_filter_out_seq => '',
         pepthresh => '',
-        one_site_per_contig => '0',
+        one_site_per_contig => '1',
+        full_summary_plots => '1',
+        max_mapped_reads => '',
     );
 
 my $params = Utils::parse_config('msg.cfg', \%default_params);
@@ -69,9 +71,10 @@ my %params = %$params;
 my %par1_reads = &Utils::readFasta($params{'parent1'}, 1);
 my %par2_reads = &Utils::readFasta($params{'parent2'}, 1);
 my @chroms ;
-if( $params{'chroms'} eq 'all') { 
-	@chroms = keys %par1_reads ; 
-} else { @chroms = split(/,/,$params{'chroms'}); }
+#when people ask to analyze only part of the genome, then the size of the genome
+#changes in the analysis! So, rather than trying to explain all this to end users,
+#we decided to see if we can simply trick msg into always using the full genome size.
+@chroms = keys %par1_reads ; #<- This is that trick
 
 my $numcontigs = length(@chroms) ;
 
@@ -179,7 +182,8 @@ if ($params{'cluster'} != 0) {
         ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
         ' --one_site_per_contig ' . $params{'one_site_per_contig'} .
         ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null') .
-        ' --pepthresh ' . ($params{'pepthresh'} || 'null') .        
+        ' --pepthresh ' . ($params{'pepthresh'} || 'null') .
+        ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null') .
         " || exit 100\ndone\n" .
         "/bin/date\n";
 } else {
@@ -214,7 +218,8 @@ if ($params{'cluster'} != 0) {
         ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
         ' --one_site_per_contig ' . $params{'one_site_per_contig'} .
         ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null') .
-        ' --pepthresh ' . ($params{'pepthresh'} || 'null') .                
+        ' --pepthresh ' . ($params{'pepthresh'} || 'null') .
+        ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null') .
        "\n";
     }
 close OUT;
@@ -241,12 +246,15 @@ if ($params{'cluster'} != 0) {
    if ($params{'pepthresh'} ne '') {
        &Utils::system_call("qsub -N msgRun2b.$$ -hold_jid msgRun2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv");
    }
-   #Temporarily include summaryPlots.R AND combine.py.  Once we know combine.py is working properly, remove summaryPlots.R
-   &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
-   &Utils::system_call("qsub -N msgRun3b.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/combine.py -d hmm_fit");
+   if ($params{'full_summary_plots'} == 1) {
+      &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+   }
+   else {
+      &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/combine.py -d hmm_fit");
+   }
    &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
-   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'}");
+   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'} $params{'full_summary_plots'}");
    #Cleanup - move output files to folders, remove barcode related files
    &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; truncate -s0 temp.fq; rm -f $params{'barcodes'}.*\"");
    #Notify users that MSG run has completed
@@ -262,10 +270,15 @@ if ($params{'cluster'} != 0) {
    if ($params{'pepthresh'} ne '') {
        &Utils::system_call("python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv");
    }
-   &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
+   if ($params{'full_summary_plots'} == 1) {
+        &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > msgRun3.$$.out 2> msgRun3.$$.err");
+   }
+   else {
+        &Utils::system_call("python msg/combine.py -d hmm_fit");
+   }
    &Utils::system_call("perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    #Run a simple validation
-   &Utils::system_call("python msg/validate.py $params{'barcodes'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
+   &Utils::system_call("python msg/validate.py $params{'barcodes'} $params{'full_summary_plots'} > msgRun.validate.$$.out 2> msgRun.validate.$$.err");
    #Cleanup - move output files to folders, remove barcode related files
    &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f temp.fq; rm -f $params{'barcodes'}.*");
    #Notify users that MSG run has completed

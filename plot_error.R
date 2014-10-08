@@ -1,3 +1,4 @@
+dir.create("hmm_fit_images")
 pdf("hmm_fit_images/error_gamma.pdf", width=6, height=10, pointsize=14)
 par(mfcol= c(2,1))
 err<-read.table("error_gamma", header=T)

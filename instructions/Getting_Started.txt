@@ -18,6 +18,7 @@ Please ensure that the following dependencies are installed before running MSG (
 WARNING: At least bwa, samtools, R, and the R packages MUST be the version noted above; Not the latest versions.
 
 - Python (2.6.4 or later but not 3.*)
+- bumpy (recent versions are fine)
 - bwa (0.5.7)
 - samtools (0.1.9-3)
 - biopython-1.53

@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:j:" opt
+while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:j:n:" opt
 do 
   case $opt in
       b) barcodes=$OPTARG ;;
@@ -36,6 +36,7 @@ do
       m) gff_thresh_conf=$OPTARG ;;
       u) one_site_per_contig=$OPTARG ;;
       j) pepthresh=$OPTARG ;;
+      n) max_mapped_reads=$OPTARG ;;
       *) usage ;;
   esac
 done
@@ -67,11 +68,70 @@ indivdir=$outdir/$indiv
 [ -e $indivdir/aln_${indiv}_par1-filtered.sam ] || [ -e $indivdir/aln_${indiv}_par1-filtered.sam.gz ] && \
     [ -e $indivdir/aln_${indiv}_par2-filtered.sam ] || [ -e $indivdir/aln_${indiv}_par2-filtered.sam.gz ] || {
 
+    #If $max_mapped_reads is specified, truncate sam files (preserving headers if any)
+    if [ $max_mapped_reads != "null" ]
+    then
+        echo "Truncating sam files ${samdir}/aln_${indiv}_par1.sam ${samdir}/aln_${indiv}_par2.sam"
+        if [ -e $samdir/aln_${indiv}_par1.sam ]
+        then
+            echo "Truncating ${samdir}/aln_${indiv}_par1.sam"
+            #copy original
+            cp ${samdir}/aln_${indiv}_par1.sam ${samdir}/aln_${indiv}_par1-all-reads.sam
+            #find headers if any and start replacement file with them.  (SAM docs say this regex finds headers ...)
+            grep -P "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par1.sam > ${samdir}/aln_${indiv}_par1-temp.sam
+            #Get remaining non header portion of file and add to replacement file
+            grep -P -v -m $max_mapped_reads "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par1.sam >> ${samdir}/aln_${indiv}_par1-temp.sam
+            #replace original
+            mv ${samdir}/aln_${indiv}_par1-temp.sam ${samdir}/aln_${indiv}_par1.sam
+        fi
+        if [ -e $samdir/aln_${indiv}_par2.sam ]
+        then
+            echo "Truncating ${samdir}/aln_${indiv}_par2.sam"
+            #copy original
+            cp ${samdir}/aln_${indiv}_par2.sam ${samdir}/aln_${indiv}_par2-all-reads.sam
+            #find headers if any and start replacement file with them.  (SAM docs say this regex finds headers ...)
+            grep -P "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par2.sam > ${samdir}/aln_${indiv}_par2-temp.sam
+            #Get remaining non header portion of file and add to replacement file
+            grep -P -v -m $max_mapped_reads "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par2.sam >> ${samdir}/aln_${indiv}_par2-temp.sam
+            #replace original
+            mv ${samdir}/aln_${indiv}_par2-temp.sam ${samdir}/aln_${indiv}_par2.sam
+        fi
+        if [ -e $samdir/aln_${indiv}_par1.sam.gz ]
+        then
+            echo "Truncating ${samdir}/aln_${indiv}_par1.sam.gz"
+            #copy original
+            cp ${samdir}/aln_${indiv}_par1.sam.gz ${samdir}/aln_${indiv}_par1-all-reads.sam.gz
+            #find headers if any and start replacement file with them.  (SAM docs say this regex finds headers ...)
+            zgrep -P "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par1.sam.gz > ${samdir}/aln_${indiv}_par1-temp.sam
+            #Get remaining non header portion of file and add to replacement file
+            zgrep -P -v -m $max_mapped_reads "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par1.sam.gz >> ${samdir}/aln_${indiv}_par1-temp.sam
+            #recompress
+            gzip ${samdir}/aln_${indiv}_par1-temp.sam
+            #replace original
+            mv ${samdir}/aln_${indiv}_par1-temp.sam.gz ${samdir}/aln_${indiv}_par1.sam.gz
+        fi
+        if [ -e $samdir/aln_${indiv}_par2.sam.gz ]
+        then
+            echo "Truncating ${samdir}/aln_${indiv}_par2.sam.gz"
+            #copy original
+            cp ${samdir}/aln_${indiv}_par2.sam.gz ${samdir}/aln_${indiv}_par2-all-reads.sam.gz
+            #find headers if any and start replacement file with them.  (SAM docs say this regex finds headers ...)
+            zgrep -P "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par2.sam.gz > ${samdir}/aln_${indiv}_par2-temp.sam
+            #Get remaining non header portion of file and add to replacement file
+            zgrep -P -v -m $max_mapped_reads "^@[A-Za-z][A-Za-z]\t" ${samdir}/aln_${indiv}_par2.sam.gz >> ${samdir}/aln_${indiv}_par2-temp.sam
+            #recompress
+            gzip ${samdir}/aln_${indiv}_par2-temp.sam
+            #replace original
+            mv ${samdir}/aln_${indiv}_par2-temp.sam.gz ${samdir}/aln_${indiv}_par2.sam.gz
+        fi
+    fi
+
     echo "Extracting reference allele information from SAM files for $indiv ($parent1 and $parent2)"
     echo "python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy"
     python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy || {
         echo "Error during extract-ref-alleles.py for $indiv"
     }
+   
 }
 
 echo "Creating pileup for $indiv"
