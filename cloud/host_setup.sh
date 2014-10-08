@@ -63,6 +63,14 @@ cd pysam-0.1.2/
 python setup.py install
 cd $2/msg/dependencies/
 
+#Install s3cmd (for accessing Amazon S3 hosted files)
+cd /tmp
+wget https://github.com/s3tools/s3cmd/archive/v1.5.0-rc1.tar.gz
+tar xzvf v1.5.0-rc1.tar.gz 
+cd s3cmd-1.5.0-rc1/
+python setup.py install
+cd $2/msg/dependencies/
+   
 #Install Stampy
 #wget http://www.well.ox.ac.uk/bioinformatics/Software/Stampy-latest.tgz
 tar xzvf Stampy-latest.tgz 
