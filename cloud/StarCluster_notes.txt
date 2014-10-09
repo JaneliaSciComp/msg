@@ -23,8 +23,9 @@ $ starcluster start -o -s 1 -I r3.large -m ami-14e2517c imagehost
 $ starcluster listclusters --show-ssh-status imagehost
 SSH in and make updates.
 $ starcluster sshmaster imagehost
-Save as new EBS based AMI.
+Save new AMI (use listclusters to get instance id)
+$ starcluster ebsimage <instance id> msg-starclusterv<version>
 Delete old AMI.
-Update docs to reference new AMI (or change name and ID of new AMI to match the old, deleted one)
+Update docs to reference new AMI
 
 
