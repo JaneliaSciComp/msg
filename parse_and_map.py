@@ -154,9 +154,12 @@ class ParseAndMap(CommandLineApp):
             if self.options.new_parser:
                 #check if the output file already exists
                 fastq_file = 'indiv' + self.bc[0][1] + '_' + self.bc[0][0]
-                found_fastq = [f for f in os.listdir(self.parsedir) if f.startswith(fastq_file)]
+                found_fastq = sorted([f for f in os.listdir(self.parsedir) if f.startswith(fastq_file)], key=lambda x: len(x))
                 if found_fastq:
-                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output file %s exists' % found_fastq[0] + bcolors.ENDC            
+                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output file %s exists' % found_fastq[0] + bcolors.ENDC
+                    #still trim them if applicable
+                    final_paths = [os.path.join(self.parsedir, found_fastq[0])]
+                    self.qual_trim_parsed_files(final_paths)                           
                 else:
                     self.parse_all()
             else:
@@ -176,7 +179,12 @@ class ParseAndMap(CommandLineApp):
                     assert os.path.exists('temp.fq') #Make sure unzipped file was created
             else:
                 if os.path.exists(self.parsedir):
-                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC            
+                    print bcolors.WARN + 'Refusing to parse raw reads: parsed output directory %s exists' % self.parsedir + bcolors.ENDC
+                    #still trim them if applicable
+                    final_paths = [os.path.join(self.parsedir, ('indiv' + ind[1] + '_' + ind[0])) for ind in self.bc]
+                    if GZIP_OUTPUT:
+                        final_paths = [p + '.gz' for p in final_paths]
+                    self.qual_trim_parsed_files(final_paths)
                 else:
                     self.parse_all()
         
@@ -204,6 +212,7 @@ class ParseAndMap(CommandLineApp):
         The process should be the same for both illumina indexes, and normal parsing.
         Maintain existing names"""
         if self.options.quality_trim_reads_thresh and self.options.quality_trim_reads_consec:
+            print "Initiating quality trimming on files:", str(final_paths)
             for path in final_paths:
                 if GZIP_OUTPUT:
                     gzip_switch = '-z'
