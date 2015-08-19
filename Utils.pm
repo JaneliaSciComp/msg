@@ -22,8 +22,10 @@ sub strip {
 sub system_call {
     print "\nstarted ".POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
     print "  @_\n" ;
-    system("@_") == 0 or die "Error in @_: $?" ;
+    my $val = `@_`;
+    $? == 0 or die "Error in @_: $?";
     print 'ended '.POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
+    return $val;
 }
 
 sub test_dependencies {
