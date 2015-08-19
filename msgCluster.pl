@@ -168,11 +168,12 @@ print "num barcodes is $num_barcodes!\n";
 open (OUT,'>msgRun2.sh');
 
 if ($params{'cluster'} != 0) {
-   print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
+print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
+if ($params{'cluster'}) {
 #        "start=\$SGE_TASK_ID\n\n",
 #        "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n",
 #Generalized case for Slurm and qsub:
-        "let start=\"(($params{'array_job_variable'} - 1\"\n",
+   print OUT "let start=\"(($params{'array_job_variable'} - 1\"\n",
         "let max_arrayid=\"\$start + $params{'barcodes_per_job'} - 1\"\n",
         "end=\"\$((\$max_arrayid<$num_barcodes?\$max_arrayid:$num_barcodes))\"\n",
         "for ((h=\$start; h<=\$end; h++)); do\n",
@@ -181,77 +182,45 @@ if ($params{'cluster'} != 0) {
 #        "   sed -n \"\${h}p\" $params{'barcodes'} > $params{'barcodes'}.\$h\n",
         "   sed -n \"\${h} p\" $params{'barcodes'} > $params{'barcodes'}.$$.\$h\n", #Prevent multi-run collision of barcode files
         '   perl msg/msg.pl ',
-        " --barcodes $params{'barcodes'}.$$.\$h", #Prevent multi-run collision of barcode files
-        ' --reads ' . $params{'reads'},
-        ' --parent1 ' . $params{'parent1'},
-        ' --parent2 ' . $params{'parent2'},
-        ' --chroms ' . $params{'chroms'},
-        ' --sexchroms ' . $params{'sexchroms'},
-        ' --chroms2plot ' . $params{'chroms2plot'},
-        ' --parse_or_map map-only',
-        ' --deltapar1 ' . $params{'deltapar1'},
-        ' --deltapar2 ' . $params{'deltapar2'},
-        ' --recRate ' . $params{'recRate'},
-        ' --rfac ' . $params{'rfac'},
-        ' --priors ' . $params{'priors'},
-        ' --theta ' . $params{'theta'},
-        ' --bwa_alg ' . $params{'bwa_alg'},
-        ' --bwa_threads ' . $params{'bwa_threads'},
-        ' --use_stampy ' . $params{'use_stampy'},
-        ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'},
-        ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'},
-        ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'},
-        ' --gff_thresh_conf ' . $params{'gff_thresh_conf'},
-        ' --new_parser ' . $params{'new_parser'},
-        ' --new_parser_offset ' . $params{'new_parser_offset'},
-        ' --re_cutter ' . $params{'re_cutter'},
-        ' --linker_system ' . $params{'linker_system'},
-        ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'},
-        ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
-        ' --one_site_per_contig ' . $params{'one_site_per_contig'},
-        ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
-        ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
-        ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
-        ' --logfile-directory ' . $logdir,
-        " || exit 100\ndone\n",
-        "/bin/date\n";
+        " --barcodes $params{'barcodes'}.$$.\$h"; #Prevent multi-run collision of barcode files
 } else {
-   print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
-        '   perl msg/msg.pl ',
-        ' --barcodes ' . $params{'barcodes'},
-        ' --reads ' . $params{'reads'},
-        ' --parent1 ' . $params{'parent1'},
-        ' --parent2 ' . $params{'parent2'},
-        ' --chroms ' . $params{'chroms'},
-        ' --sexchroms ' . $params{'sexchroms'},
-        ' --chroms2plot ' . $params{'chroms2plot'},
-        ' --parse_or_map map-only',
-        ' --deltapar1 ' . $params{'deltapar1'},
-        ' --deltapar2 ' . $params{'deltapar2'},
-        ' --recRate ' . $params{'recRate'},
-        ' --rfac ' . $params{'rfac'},
-        ' --priors ' . $params{'priors'},
-        ' --theta ' . $params{'theta'},
-        ' --bwa_alg ' . $params{'bwa_alg'},
-        ' --bwa_threads ' . $params{'bwa_threads'},
-        ' --use_stampy ' . $params{'use_stampy'},
-        ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'},
-        ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'},
-        ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'},
-        ' --gff_thresh_conf ' . $params{'gff_thresh_conf'},
-        ' --new_parser ' . $params{'new_parser'},
-        ' --new_parser_offset ' . $params{'new_parser_offset'},
-        ' --re_cutter ' . $params{'re_cutter'},
-        ' --linker_system ' . $params{'linker_system'},
-        ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'},
-        ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
-        ' --one_site_per_contig ' . $params{'one_site_per_contig'},
-        ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
-        ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
-        ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
-        ' --logfile-directory ' . $logdir,
-       "\n";
-    }
+   print OUT "perl msg/msg.pl --barcodes $params{'barcodes'}";
+}
+   print OUT ' --reads ' . $params{'reads'},
+   ' --parent1 ' . $params{'parent1'},
+   ' --parent2 ' . $params{'parent2'},
+   ' --chroms ' . $params{'chroms'},
+   ' --sexchroms ' . $params{'sexchroms'},
+   ' --chroms2plot ' . $params{'chroms2plot'},
+   ' --parse_or_map map-only',
+   ' --deltapar1 ' . $params{'deltapar1'},
+   ' --deltapar2 ' . $params{'deltapar2'},
+   ' --recRate ' . $params{'recRate'},
+   ' --rfac ' . $params{'rfac'},
+   ' --priors ' . $params{'priors'},
+   ' --theta ' . $params{'theta'},
+   ' --bwa_alg ' . $params{'bwa_alg'},
+   ' --bwa_threads ' . $params{'bwa_threads'},
+   ' --use_stampy ' . $params{'use_stampy'},
+   ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'},
+   ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'},
+   ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'},
+   ' --gff_thresh_conf ' . $params{'gff_thresh_conf'},
+   ' --new_parser ' . $params{'new_parser'},
+   ' --new_parser_offset ' . $params{'new_parser_offset'},
+   ' --re_cutter ' . $params{'re_cutter'},
+   ' --linker_system ' . $params{'linker_system'},
+   ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'},
+   ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
+   ' --one_site_per_contig ' . $params{'one_site_per_contig'},
+   ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
+   ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
+   ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
+   ' --logfile-directory ' . $logdir;
+if ($params{'cluster'}) {
+   print OUT " || exit 100\ndone\n";
+}
+        
 close OUT;
 &Utils::system_call("chmod 755 msgRun2.sh");
 
@@ -446,5 +415,6 @@ if ($params{'cluster'} != 0) {
    }
 }
 
+end:
 print "\nNOTE: Output and error messages are located in msgOut.$$, msgError.$$, and logs.$$ folders.\n\n";
 exit;
