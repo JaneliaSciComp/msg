@@ -19,9 +19,9 @@ open BC, $barcodefile or die "wrong format for barcodefile\n";
 #my $junk = <BC>; $junk = <BC>; 
 my @barcodes = (); 
 while (my $line = <BC>) {
-    my @rows = split('\t', $line);
-    #remove any line endings since I believe windows line endings can appear and wreak havoc.
-    $rows[1] =~ s/\r?\n?$//;
+    chomp $line; #Removes trailing newline
+    $line =~ s/\r*//; #Removes any carriage returns, e.g. from Windows or Mac newlines
+    my @rows = split('\s+', $line); #Split the barcodes file on one or more whitespace characters (e.g. \t)
     my $barcodename = "indiv".$rows[1]."_".$rows[0];
     push(@barcodes, $barcodename);
 }

@@ -50,27 +50,39 @@ def create_stats(raw_data, barcodes_file):
     stats_file = open(stats_file_name,'w')
     #print file with statistics of parsing
     total_reads = 0
-    read_file = './'+raw_data+'_parsed/bad_barcodes'
-    number_reads = count_lines(read_file)/4
-    stats_file.write('bad_barcodes\t%s\n' %(number_reads))
-    total_reads += number_reads
+    if os.path.exists(read_file): #Catch the case where the bad_barcodes file wasn't created or copied over to the parsed reads directory
+        read_file = './'+raw_data+'_parsed/bad_barcodes'
+        number_reads = count_lines(read_file)/4
+        stats_file.write('bad_barcodes\t%s\n' %(number_reads))
+        total_reads += number_reads
+    else:
+        stats_file.write('bad_barcodes\tNA\n')
 
     read_file = './'+raw_data+'_parsed/unreadable_barcodes'
-    number_reads = count_lines(read_file)/4
-    stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
-    total_reads += number_reads
+    if os.path.exists(read_file): #Catch the case where the unreadable_barcodes file wasn't created or copied over to the parsed reads directory
+        number_reads = count_lines(read_file)/4
+        stats_file.write('unreadable_barcodes\t%s\n' %(number_reads))   
+        total_reads += number_reads
+    else:
+        stats_file.write('unreadable_barcodes\tNA\n')
 
     read_file = './'+raw_data+'_parsed/linkers'
-    number_reads = count_lines(read_file)/2
-    stats_file.write('linkers\t%s\n' %(number_reads))   
-    total_reads += number_reads
+    if os.path.exists(read_file): #Catch the case where the linkers file wasn't created or copied over to the parsed reads directory
+        number_reads = count_lines(read_file)/2
+        stats_file.write('linkers\t%s\n' %(number_reads))   
+        total_reads += number_reads
+    else:
+        stats_file.write('linkers\tNA\n')
 
     read_file = './'+raw_data+'_parsed/junk'
-    number_reads = count_lines(read_file)/4
-    stats_file.write('junk\t%s\n' %(number_reads))   
-    total_reads += number_reads
+    if os.path.exists(read_file): #Catch the case where the junk file wasn't created or copied over to the parsed reads directory
+        number_reads = count_lines(read_file)/4
+        stats_file.write('junk\t%s\n' %(number_reads))   
+        total_reads += number_reads
+    else:
+        stats_file.write('junk\tNA\n')
 
-    total_reads = 0
+    total_reads = 0 #Why?
     for ind in read_barcodes(barcodes_file):
         file_name = 'indiv' + ind[1] + '_' + ind[0]
         fastq_file = raw_data + '_parsed/' + file_name

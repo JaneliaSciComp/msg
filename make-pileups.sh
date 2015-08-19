@@ -13,17 +13,15 @@ die () {
     exit ${2:-1}
 }
 
-true=0
-false="false"
-
-all=$false
+all=1
+#Defaults $all to true
 
 while getopts "ai:d:p:q:" opt
 do 
   case $opt in
       i) indiv=$OPTARG ;;
       d) dir=$OPTARG ;;
-      a) all=$true ;;
+      a) all=$OPTARG ;;
       r) range=$OPTARG ;;
       p) parent1=$OPTARG ;;
       q) parent2=$OPTARG ;;
@@ -37,9 +35,12 @@ shift $(($OPTIND - 1))
 species=par1
 [ -e $parent1 ] || die "$parent1 doesn't exist"
 
-#[ $all ] && refs=$(ls $dir/refs/par1/*-ref.alleles | perl -pe 's/-ref.alleles//' | sed -n "${range}p") || \
-[ $all ] && refs=$(ls $dir/refs/par1 | grep '\-ref.alleles' | perl -pe 's/-ref.alleles//' | sed -n "${range}p") || \
-    refs="4 X 3L 3R 2L 2R"
+if [ $all -eq 1 ]; then
+   refs=$(ls $dir/refs/par1 | grep '\-ref\.alleles' | perl -pe 's/-ref.alleles//')
+   if [ -z $range ]; then
+      refs=$(echo ${refs} | sed -n "${range} p")
+   fi
+fi
 
 file=$dir/aln_${indiv}_${species}-filtered
 echo "$file"

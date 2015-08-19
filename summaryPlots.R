@@ -72,24 +72,31 @@ cat("Extracting markers for the following contigs:\n",opts$c);
 pp1 <- get.ancestry.probs("par1", thinfac=1, difffac=0, contigs2use=contigs, type="all")
 pp <- pp2 <- get.ancestry.probs("par2", thinfac=1, difffac=0, contigs2use=contigs, type="all")
 p1 <- do.call("cbind", pp1)
+rm(pp1) #Reduce memory consumption
 p <- p2 <- do.call("cbind", pp2)
+rm(pp2); #Reduce memory consumption
 
 contig.lengths <- sapply(pp, ncol)
+rm(pp); #Reduce memory consumption
 contig.fac <- factor(rep(contigs, contig.lengths))
 #current_contigs <- contigs[contigs %in% levels(contig.fac)]
 current_contigs <- levels(contig.fac)[match(contigs,levels(contig.fac),nomatch="0")]
 
 pos <- as.integer(colnames(p))
+rm(p); #Reduce memory consumption
 info <- contig.info(pos, contig.fac, chrLengths[current_contigs])
 
 if(write.ancestry.probs) {
     p1.table <- p1
+    rm(p1); #Reduce memory consumption
     p2.table <- p2
+    rm(p2); #Reduce memory consumption
     colnames(p1.table) <- colnames(p2.table) <- paste(contig.fac, pos, sep=":")
     p12.table <- 1 - (p1.table + p2.table)
     msg.write.table(round(p1.table, 6), file="ancestry-probs-par1.tsv")
     msg.write.table(round(p2.table, 6), file="ancestry-probs-par2.tsv")
     msg.write.table(round(p12.table, 6), file="ancestry-probs-par1par2.tsv")
+    rm(p1.table, p2.table, p12.table); #Reduce memory consumption
 }
 
 genomeplot <- function(y, ...) {
@@ -104,12 +111,14 @@ genomeplot <- function(y, ...) {
 ##
 ## TODO: should save these R objects into Robjects output dir
 cat("\nOff-diagonal LOD profile...\n");
-pp1 <- get.ancestry.probs("par1", thinfac=1, difffac=0, contigs2use=contigs2plot, type="plot")
+#pp1 <- get.ancestry.probs("par1", thinfac=1, difffac=0, contigs2use=contigs2plot, type="plot") #pp1 never used
 pp <- pp2 <- get.ancestry.probs("par2", thinfac=1, difffac=0, contigs2use=contigs2plot, type="plot")
-p1 <- do.call("cbind", pp1)
+#p1 <- do.call("cbind", pp1) #p1 never used
 p <- p2 <- do.call("cbind", pp2)
+rm(p2, pp2); #Reduce memory consumption
 
 contig.lengths <- sapply(pp, ncol)
+rm(pp); #Reduce memory consumption
 contig.fac <- factor(rep(contigs2plot, contig.lengths))
 current_contigs <- levels(contig.fac)[match(contigs2plot,levels(contig.fac),nomatch="0")]
 
@@ -146,6 +155,8 @@ pdf(file.path(imagedir, "missing.pdf"), width=10, height=5)
 genomeplot(colMeans(is.na(p)), ylab="Missing proportion")
 dev.off()
 
+rm(p, rhat.offdiag, rlod.offdiag); #Reduce memory consumption
+
 
 if(plot.correlation.matrix) {
     ##
@@ -162,6 +173,7 @@ if(plot.correlation.matrix) {
     pp.thin <- pp2.thin <- get.ancestry.probs("par2", thinfac=thinfac, difffac=difffac, contigs=contigs2plot, pna.thresh=pna.thresh, type="thinned_plot")
     ## p1.thin <- do.call("cbind", pp1.thin)
     p.thin <- p2.thin <- do.call("cbind", pp2.thin)
+    rm(pp2.thin); #Reduce memory consumption
     contig.lengths.thin <- sapply(pp.thin, ncol)
     contig.fac.thin <- factor(rep(contigs2plot, contig.lengths.thin))
 	 current_contigs <- levels(contig.fac.thin)[match(contigs2plot,levels(contig.fac.thin),nomatch="0")] ### Tina
@@ -179,12 +191,14 @@ if(plot.correlation.matrix) {
 	        ## msg.write.table(round(p1.thin.table, 6), file="ancestry-probs-thinned-par1.tsv")
 	        msg.write.table(round(p2.thin.table, 6), file="ancestry-probs-thinned-par2.tsv")
 	        ## msg.write.table(round(p12.thin.table, 6), file="ancestry-probs-thinned-par1par2.tsv")
+           rm(p2.thin.table); #Reduce memory consumption
 	    }
 	
 	    ##
 	    ## plot heatmap
 	    ##
 	    n <- nrow(pp.thin[[1]])
+       rm(pp.thin); #Reduce memory consumption
 	    lod.max <- n*log10(2)
 	    lod.thin.fname <- sprintf("lod-thin-%f-%f-%f.rda",thinfac,difffac,pna.thresh)
 
@@ -194,6 +208,7 @@ if(plot.correlation.matrix) {
 	    } else {
 	        lod.thin <- read.object(lod.thin.fname)
 	    }
+       rm(p.thin); #Reduce memory consumption
 	
 	    cat("Plotting heatmap...\n");
 	    bitmap(file=file.path(imagedir, "lod-matrix.bmp"), width=100, height=100, bg="transparent");

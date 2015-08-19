@@ -1,17 +1,18 @@
 #!/usr/bin/env perl
 use File::Basename;
 use File::Copy;
-use Getopt::Long ;
+use Getopt::Long;
 use lib qw(./msg .);
 use Utils;
 
-$true = 1 ;
-$false = 0 ;
+my $true = 1;
+my $false = 0;
 #Read in version from version file
-$version = do { local( @ARGV, $/ ) = './msg/version' ; <> } ;
+my $version = do { local( @ARGV, $/ ) = './msg/version'; <> };
 
-$src = dirname $0 ;
-$update_genomes = $false ;
+my $src = dirname $0;
+my $update_genomes = $false;
+my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $parent2_genome, $parent1_reads, $parent2_reads, $update_minQV, $min_coverage, $max_coverage_stds, $max_coverage_exceeded_state, $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa, $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate, $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds, $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir);
 
 GetOptions(
     'barcodes|b=s' => \$barcodes,
@@ -63,13 +64,14 @@ GetOptions(
     'one_site_per_contig=i' => \$one_site_per_contig,
     'pepthresh=s' => \$pepthresh,
     'max_mapped_reads=s' => \$max_mapped_reads,
+    'logfile_directory=s' => \$logdir
     );
 
 #### INTERNAL OPTIONS (for developers) #####
 
 # Should MD tags be added to mapped SAM files when they are not included by default.
 # It's slower to add them but they seem to affect the output.
-$GEN_MD_TAGS = $true;
+my $GEN_MD_TAGS = $true;
 
 ############################################
 
@@ -111,6 +113,7 @@ print "pepthresh $pepthresh\n\n";
 print "max_mapped_reads $max_mapped_reads\n\n";
 #only update parentals passes this in, so you won't see it on standard msg runs:
 print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
+print "logfile_directory $logdir\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -124,6 +127,8 @@ else{
 	$parent2_genome or die "\nERROR: Must use --parent2 option to supply parent2 genome file" ;
 }
 
+my %genomes_fa;
+my %genome_index;
 $genomes_fa{'parent1'} = $parent1_genome if $parent1_genome;
 $genomes_fa{'parent2'} = $parent2_genome if $parent2_genome;
 $genome_index{'parent1'} = $bwaindex1;
@@ -151,7 +156,7 @@ sub run_stampy_on_cluster {
     # Run stampy on SGE cluster.  Note, design-wise, normally all qsub/cluster calls should be in 
     # msgCluster.pl but it wasn't practical in this case.
     
-    my ($sp, $bwa_options, $out) = @_;
+    my ($sp, $bwa_options, $out, $stampy_pseudo_threads, $reads_for_updating_fq_current_sp, $parent_stampy_substitution_rate) = @_;
     
     #Use 4 slots of the PE options is available since we need ~7GB of memory for each job.
     #We assume PE option is available if the user has specified the option in config file.
@@ -165,7 +170,7 @@ sub run_stampy_on_cluster {
         "for ((h=\$start; h<=\$end; h++)); do\n" .
         "   stampy.py " . $bwa_options . 
         " --processpart=\${h}/$stampy_pseudo_threads" .
-        " -g $sp.stampy.msg -h $sp.stampy.msg -M $reads_for_updating_fq{$sp}" .
+        " -g $sp.stampy.msg -h $sp.stampy.msg -M $reads_for_updating_fq_current_sp" .
         " --substitutionrate $parent_stampy_substitution_rate" .
         " -o $out.tmp.\${h}.sam" .
         "   || exit 100\n" .
@@ -207,17 +212,19 @@ sub run_stampy_on_cluster {
 ## -------------------------------------------------------------------------------
 ##
 ## UPDATE REFERENCES
+my %reads_for_updating_fq;
+my %reads_for_updating;
 if( $update_genomes ) {
-	%reads_for_updating_fq;
 	$reads_for_updating_fq{'parent1'} = $parent1_reads if ($parent1_reads);
 	$reads_for_updating_fq{'parent2'} = $parent2_reads if ($parent2_reads);
 	#%reads_for_updating_fq = (parent1 => $parent1_reads, parent2 => $parent2_reads) ;
 
     #Make sure parents' reads files are specified and exist 
-	for $sp (keys %reads_for_updating_fq) {
-		$reads = $reads_for_updating_fq{$sp} ;
+	for my $sp (keys %reads_for_updating_fq) {
+		my $reads = $reads_for_updating_fq{$sp} ;
 		$reads or die "Must supply --$sp-reads" ;
 		-e $reads or die "No such file: $reads" ;
+      my ($d, $s);
 		($reads_for_updating{$sp}, $d, $s) = fileparse $reads, qr/\.[^.]*$/ ;
 		$s eq ".fq" or $s eq ".fastq" or $s eq ".gz" or print "$sp reads extension is $s: expecting .fq or .fastq\n" ;
 	}
@@ -236,7 +243,7 @@ else {
 
 if( $update_genomes ) {
     print "Updating genomes\n";
-    foreach $sp ( keys %reads_for_updating ) {
+    foreach my $sp ( keys %reads_for_updating ) {
         if( -e $genomes_fa{$sp}.".msg.updated.fasta" ) {
             print "$sp: updated genome files already present\n" ;
             next ;
@@ -245,85 +252,85 @@ if( $update_genomes ) {
         #Trim reads if required (you could run this conncurrently while trimming barcoded reads for a speed up in the future.)
         if ($quality_trim_reads_thresh > 0) {
             &Utils::system_call("python","$src/TQSfastq.py","-f",$reads_for_updating_fq{$sp},"-t",$quality_trim_reads_thresh,
-                "-c",$quality_trim_reads_consec,"-q","-z","-o",$reads_for_updating_fq{$sp});
+                "-c",$quality_trim_reads_consec,"-q","-z","-o",$reads_for_updating_fq{$sp},"> $logdir/TQSfastq${sp}.msg$$.stdout 2> $logdir/TQSfastq${sp}.msg$$.stderr");
             $reads_for_updating_fq{$sp} = $reads_for_updating_fq{$sp} . '.trim.fastq.gz';
         }
     
-        &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg") ;
+        &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", $genomes_fa{$sp}, "-o", "$genomes_fa{$sp}.msg", "> $logdir/reformatFasta4sam${sp}.msg$$.stdout 2> $logdir/reformatFasta4sam${sp}.msg$$.stderr") ;
     
-        $out = "update_reads-aligned-$sp" ;
+        my $out = "update_reads-aligned-$sp" ;
         unless( -e "$out.pileup" ) {
             #Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
-            &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg") 
+            &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg", "> $logdir/bwaIndex${sp}.msg$$.stdout 2> $logdir/bwaIndex${sp}.msg$$.stderr") 
                 unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg") ;
+            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg", "> $logdir/samtoolsFaidx${sp}.msg$$.stdout 2> $logdir/samtoolsFaidx${sp}.msg$$.stderr") ;
     
             unless (-e "$out.sam") {
                 if ($use_stampy == 1) {
                     #Build stampy genome file
-                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg") ;
+                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg", "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
                     #Build stampy hash file
-                    &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg") ;
+                    &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
                     #Call stampy mapping with or without bwa
                     my $bwa_options = "";
                     if ($stampy_premap_w_bwa == 1) {
                         $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg\"";
                     }
                     if (($stampy_pseudo_threads > 0) && ($cluster == 1)) {
-                        run_stampy_on_cluster($sp, $bwa_options, $out);
+                        run_stampy_on_cluster($sp, $bwa_options, $out, $stampy_pseudo_threads, $reads_for_updating_fq{$sp}, $parent_stampy_substitution_rate);
                     }
                     else {
                         #Standard Stampy run w/o qsub
                         &Utils::system_call("stampy.py", $bwa_options, 
                             "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", 
                             "--substitutionrate", $parent_stampy_substitution_rate,
-                            "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam") ;
+                            "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam", "> $logdir/stampyRun${sp}.msg$$.stdout 2> $logdir/stampyRun${sp}.msg$$.stderr");
                     }                    
                 }
                 elsif ($bwa_alg eq 'aln') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai") ;
-                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai", "2> $logdir/bwaAln${sp}.msg$$.stderr");
+                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSamse${sp}.msg$$.stderr");
                 }
                 elsif ($bwa_alg eq 'bwasw') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam") ;
+                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSW${sp}.msg$$.stderr");
                 }
                 else {die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln or bwasw (or set use_stampy=1)";}
 
             }
             
             # Filter out unmapped reads, etc
-            &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy) ;
+            &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy, "> $logdir/filter-sam${sp}.msg$$.stdout 2> $logdir/filter-sam${sp}.msg$$.stderr") ;
             if ($parent_mapq_filter > 0) {
-                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam");
+                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
             }
             else {
-                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam");
+                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
             }
-            &Utils::system_call("samtools", "sort", "$out.bam", "$out.bam.sorted") ;
+            &Utils::system_call("samtools", "sort", "$out.bam", "$out.bam.sorted", "> $logdir/samtoolsSort${sp}.msg$$.stdout 2> $logdir/samtoolsSort${sp}.msg$$.stderr");
             
             if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
                 if ($debug == $true) {
-                    &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam")
+                    &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam");
                 }
                 #Put back in MD tags, bwasw and stampy omit them:
-                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam") ;
+                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam", "2> $logdir/samtoolsCalmd${sp}.msg$$.stderr");
                 if ($debug == $true) {
                     #copy instead of move for debug mode so we can view each step
-                    &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam")                
+                    &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam");               
                 }
                 else {
                     #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
-                    &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam")
+                    &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam");
                 }
             }
-            &Utils::system_call("samtools", "index", "$out.bam.sorted.bam") ;
-            &Utils::system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup") ;
+            &Utils::system_call("samtools", "index", "$out.bam.sorted.bam", "> $logdir/samtoolsIndex${sp}.msg$$.stdout 2> $logdir/samtoolsIndex${sp}.msg$$.stderr");
+            &Utils::system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup", "2> $logdir/samtoolsPileup${sp}.msg$$.stderr");
 
         }
 
         #Update the parent genome with the newly mapped reads
 		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
-            $max_coverage_exceeded_state, $max_coverage_stds);
+            $max_coverage_exceeded_state, $max_coverage_stds, "> $logdir/updateRef${sp}.msg$$.stdout 2> $logdir/updateRef${sp}.msg$$.stderr");
 						
 		## Re-run BWA against updated refs
 		## Not doing that at the moment
@@ -338,15 +345,17 @@ if( $update_genomes ) {
 ## -------------------------------------------------------------------------------
 ##
 ## Use BWA to align raw reads against genomes, creating two sam files for each parent ref
-for $sp (keys %genomes_fa) {
-	-e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}" ;
+my %genomes;
+for my $sp (keys %genomes_fa) {
+	-e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}";
 
-	($genomes{$sp}, $d, $s) = fileparse $genomes_fa{$sp}, qr/\.[^.]*$/ ;
-	$s eq ".fa" or $s eq ".fasta" or $s eq ".gz" or print "$sp genome extension is $s: expecting .fa or .fasta\n" ;
+   my ($d, $s);
+	($genomes{$sp}, $d, $s) = fileparse $genomes_fa{$sp}, qr/\.[^.]*$/;
+	$s eq ".fa" or $s eq ".fasta" or $s eq ".gz" or print "$sp genome extension is $s: expecting .fa or .fasta\n";
 	
 	if ($parse_or_map eq 'parse-only') {
 		### reformat for samtools (60 chars per line)
-		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa") unless (-e "${sp}_ref.fa") ;
+		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa", "> $logdir/reformatFasta4sam${sp}.msg$$.stdout 2> $logdir/reformatFasta4sam${sp}.msg$$.stderr") unless (-e "${sp}_ref.fa");
 	}
 }
 
@@ -355,21 +364,23 @@ for $sp (keys %genomes_fa) {
 $parse_or_map = "--$parse_or_map" if ($parse_or_map);
 
 ### BWA INDEXING
-foreach $sp ( keys %genomes ) {
+foreach my $sp ( keys %genomes ) {
 	unless( -e "$genomes_fa{$sp}.bwt" and -e "$genomes_fa{$sp}.ann" ) {
 		## 1. Align reads against existing genome -> sam file
 		## Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
-		@args = ("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}) ;
+		#@args = ("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}) ;
 		print "Running index on reformatted fa:\n";
-		print "@args\n" ;
-		system("@args") == 0 or die "Error in @args: $?" ;
+      #Replacing this system() call with &Utils::system_call() call
+      &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}, "> $logdir/bwaIndex${sp}.msg$$.stdout 2> $logdir/bwaIndex${sp}.msg$$.stderr");
+		#print "@args\n" ;
+		#system("@args") == 0 or die "Error in @args: $?" ;
 		#When mapping with stampy, perform the genome and hash building steps here
         if ($use_stampy == 1) {
             #Build stampy genome file
-            &Utils::system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}) ;
+            &Utils::system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}, "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
             #Build stampy hash file
             &Utils::system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
-                "$genomes_fa{$sp}.stampy.msg") ;
+                "$genomes_fa{$sp}.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
         }
 	}
 }
@@ -377,7 +388,7 @@ foreach $sp ( keys %genomes ) {
 
 #Map each individual (when called by msgRun2 with map-only, or parse all individuals when
 # called by msgRun1 with parse only)
-$samfiles_dir = basename($raw_read_data) . "_sam_files" ;
+my $samfiles_dir = basename($raw_read_data) . "_sam_files";
 mkdir $samfiles_dir unless (-d $samfiles_dir);
 &Utils::system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
 		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
@@ -390,7 +401,7 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
         '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug,
         '--new_parser', $new_parser || '0', '--new_parser_offset', $new_parser_offset || '0',
         '--new_parser_filter_out_seq', $new_parser_filter_out_seq || 'null',
-        ) ;
+        "> $logdir/parseAndMap.msg$$.stdout 2> $logdir/parseAndMap.msg$$.stderr");
 
 ## Strip species out of reference column
 
@@ -433,7 +444,7 @@ if ($parse_or_map eq '--map-only') {
              '-u', $one_site_per_contig,
              '-j', $pepthresh,
              '-n', $max_mapped_reads,
-   		  ) ;
+   		  "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
 
    } close BARCODE;
 }

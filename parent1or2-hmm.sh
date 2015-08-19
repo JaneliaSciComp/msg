@@ -54,8 +54,15 @@ shift $(($OPTIND - 1))
 date
 echo "version 0.0"
 
-plate=$(echo $indiv | perl -pe 's/^indiv([A-Z][0-9][0-9]?)_.+/$1/')
-sex=$(perl -ne "print if /[ACGT]+\t$plate\t/" $barcodes | cut -f4)
+#plate=$(echo $indiv | perl -pe 's/^indiv([A-Z][0-9][0-9]?)_.+/$1/')
+#sex=$(perl -ne "print if /[ACGT]+\t$plate\t/" $barcodes | cut -f4)
+#Barcode file structure: barcode indiv_id plate_id sex
+#Column delimiter should still be tabs, but some text editors misinterpret the tab key as a fixed number of spaces.
+#Thus we handle the general case of the delimiter being one or more whitespace characters (i.e. \s+).
+#We also handle the general case for the individual's ID, as just being "indiv" followed by one or more non-whitespace characters.
+indivnumber=$(echo $indiv | perl -pe 's/^indiv(\S+)_.+/$1/')
+sex=$(perl -ne "print if /^[ACGT]+\s+$indivnumber\s+/" $barcodes | awk ' { print $4; } ')
+plate=$(perl -ne "print if /^[ACGT]+\s+$indivnumber\s+/" $barcodes | awk ' { print $3; } ')
 [ -z "$sex" ] && sex=female
 
 echo ; echo ; echo "---------------------------------------------------------------------" ; echo
@@ -138,6 +145,12 @@ echo "Creating pileup for $indiv"
 echo "bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2>&1 | grep -vF 'deleted'"
 bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2>&1 | grep -vF 'deleted'
 
+#Check for existence of the pileup files:
+if [ -z $(ls $indivdir | grep '\.pileup') ]; then
+   echo "Error: make-pileups.sh failed to create any pileup files for $indiv."
+   exit 3
+fi
+
 
 echo "Writing HMM input data for $indiv"
 cmd="Rscript $src/write-hmm-data.R -i $indiv -d $indivdir -c $chroms"
@@ -146,6 +159,12 @@ exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
 $cmd || {
     echo "Error during write-hmm-data.R for $indiv"
 }
+
+#Check for existence of the hmmdata files:
+if [ -z $(ls $indivdir | grep '\.hmmdata') ]; then
+   echo "Error: write-hmm-data.R failed to create any hmmdata files for $indiv."
+   exit 4
+fi
 
 
 echo "Fitting HMM for $indiv"
