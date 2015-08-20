@@ -96,9 +96,9 @@ my @chroms ;
 #when people ask to analyze only part of the genome, then the size of the genome
 #changes in the analysis! So, rather than trying to explain all this to end users,
 #we decided to see if we can simply trick msg into always using the full genome size.
-@chroms = keys %par1_reads ; #<- This is that trick
+@chroms = keys %par1_reads; #<- This is that trick
 
-my $numcontigs = length(@chroms) ;
+my $numcontigs = scalar(@chroms);
 
 open (OUT,'>msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLengths: $!\n";
 print OUT "chr,length\n";
@@ -108,7 +108,7 @@ close OUT;
 ####################################################################################################
 ### Parsing
 open (OUT,'>msgRun1.sh');
-print OUT "/bin/hostname\n/bin/date\n",
+print OUT '/bin/hostname\n/bin/date\n',
     'perl msg/msg.pl ',
     ' --barcodes ' . $params{'barcodes'},
     ' --re_cutter ' . $params{'re_cutter'},
@@ -128,7 +128,7 @@ print OUT "/bin/hostname\n/bin/date\n",
     ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
     ' --new_parser ' . $params{'new_parser'},
     ' --new_parser_offset ' . $params{'new_parser_offset'},
-    " --parse_or_map parse-only";
+    ' --parse_or_map parse-only';
 
 if ($params{'new_parser_filter_out_seq'}) {
     print OUT ' --new_parser_filter_out_seq ' . $params{'new_parser_filter_out_seq'};
