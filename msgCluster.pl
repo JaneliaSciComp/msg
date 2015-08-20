@@ -167,7 +167,6 @@ print "num barcodes is $num_barcodes!\n";
 # at the begining of msgRun2.
 open (OUT,'>msgRun2.sh');
 
-if ($params{'cluster'} != 0) {
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
 if ($params{'cluster'}) {
 #        "start=\$SGE_TASK_ID\n\n",
@@ -233,7 +232,7 @@ mkdir "msgError.$$" unless (-d "msgError.$$");
 #Added parameters to generalize the cluster submission process
 my ($jobname, $jobid, $prev_jobname, $prev_jobid);
 
-#TODO: Clean up the following job submission code, and the cluster vs. non-cluster .sh file generation above...
+#TODO: Clean up the following job submission code
 
 if ($params{'msgRun1'}) { #Make msgRun1 optional
     if ($params{'cluster'} != 0) {
