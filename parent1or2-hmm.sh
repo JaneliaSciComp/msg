@@ -146,7 +146,7 @@ echo "bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2
 bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2>&1 | grep -vF 'deleted'
 
 #Check for existence of the pileup files:
-if [ -z $(ls $indivdir | grep '\.pileup') ]; then
+if [[ -z $(ls $indivdir | grep '\.pileup') ]]; then
    echo "Error: make-pileups.sh failed to create any pileup files for $indiv."
    exit 3
 fi
@@ -161,7 +161,7 @@ $cmd || {
 }
 
 #Check for existence of the hmmdata files:
-if [ -z $(ls $indivdir | grep '\.hmmdata') ]; then
+if [[ -z $(ls $indivdir | grep '\.hmmdata') ]]; then
    echo "Error: write-hmm-data.R failed to create any hmmdata files for $indiv."
    exit 4
 fi
