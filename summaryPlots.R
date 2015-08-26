@@ -97,6 +97,8 @@ if(write.ancestry.probs) {
     msg.write.table(round(p2.table, 6), file="ancestry-probs-par2.tsv")
     msg.write.table(round(p12.table, 6), file="ancestry-probs-par1par2.tsv")
     rm(p1.table, p2.table, p12.table); #Reduce memory consumption
+} else {
+    rm(p1, p2); #Reduce memory consumption
 }
 
 genomeplot <- function(y, ...) {
