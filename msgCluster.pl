@@ -1,5 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
+use warnings;
 use strict;
+use File::Basename;
 use lib qw(./msg .);
 use Utils;
 
@@ -7,8 +9,14 @@ print "\nMSG\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
 printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$sec;
 
+### Determine the (relative or absolute, it doesn't really matter) path to the "msg" directory:
+my $pathToMSG = dirname(__FILE__);
+### Error out if some typical files can't be found in the above-determined directory
+### since if they can't be found, the MSG install or placement of msgCluster.pl is atypical.
+die "Something went wrong while trying to find MSG.  We tried this directory: ${pathToMSG}/, but it didn't work." unless (-e "${pathToMSG}/msg.pl" and -e "${pathToMSG}/parse_and_map.py" and -e "${pathToMSG}/parent1or2-hmm.sh" and -e "${pathToMSG}/summaryPlots.R");
+
 ### Make sure all required dependencies are installed
-&Utils::test_dependencies();
+&Utils::test_dependencies($pathToMSG);
 
 ### Default parameters
 ### All of these parameters are required

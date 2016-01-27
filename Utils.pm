@@ -29,13 +29,14 @@ sub system_call {
 }
 
 sub test_dependencies {
-    # Make sure all required dependencies are installed
-    system_call("bash msg/print_dependencies.sh | tee dependencies.out");
-    my $last_path = getcwd();
-    chdir('msg') or die "$!";
-    #system_call("chmod 755 test_dependencies.sh");
+    # The single parameter to this function is the relative or absolute path to the "msg" directory:
+    my ($pathToMSG) = @_;
+    # Make sure all required dependencies are installed via the various "test_dependencies.*" scripts:
+    system_call("bash ${pathToMSG}/print_dependencies.sh | tee dependencies.out");
+    my $cwd = getcwd();
+    chdir($pathToMSG) or die "$!";
     system_call("bash test_dependencies.sh");
-    chdir($last_path) or die "$!";
+    chdir($cwd) or die "$!";
 }
 
 sub parse_config {
