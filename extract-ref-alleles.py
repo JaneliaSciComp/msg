@@ -262,7 +262,9 @@ class App(CommandLineApp):
                 seq_forward['par2'] = seq_forward['par2'].reverse_complement()
 
             if str(seq_forward['par1']) != str(seq_forward['par2']):
-                print read.qname
+                #Output the read that maps to a structural variant between the references (inversion?):
+                print read['par1'].qname
+                print read['par2'].qname
                 print seq_forward['par1']
                 print seq_forward['par2']
                 raise Exception('Reads on line %d differ' % i)
