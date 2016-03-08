@@ -42,6 +42,7 @@ plot.contigs <- unlist(strsplit(opts$y,split=","))
 if(opts$c == "all") main.contigs <- contigs;
 if(opts$y == "all") plot.contigs <- contigs;
 sex.chroms <- unlist(strsplit(opts$x,split=","))
+if(opts$x == "all") sex.chroms <- contigs; #Account for haplodiploid species
 
 aveSpace <- sum(as.numeric(contigLengths[contigLengths$chr %in% plot.contigs,]$length)) / length(plot.contigs)
 plotPadding <- 10^(ceiling(log10(aveSpace))-2)
