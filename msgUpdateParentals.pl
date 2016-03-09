@@ -38,6 +38,11 @@ my %default_params = (
 
 my $params = Utils::parse_config('update.cfg', \%default_params);
 
+my $logdir = "logs.$$"; #This variable can be used in msg.cfg within any of the cluster submission option strings
+#e.g. for Slurm, submit_cmd might be "sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr"
+#This would output the msgRun* STDOUT and STDERR logs into the $logdir directory.
+#Detailed logs are always placed in this directory though.
+
 # Validation of Required parameters 
 if (!((exists $params->{'parent1'} && exists $params->{'parent1_reads'}) || (exists $params->{'parent2'} && exists $params->{'parent2_reads'}))) {
     die "Missing Parameters: parent1 and parent1_reads and/or parent2 and parent2_reads";
@@ -88,8 +93,9 @@ if (exists $params{'parent1_reads'}) {
     if ($params{'custom_qsub_options_for_all_cmds'}) {
         print OUT ' --custom_qsub_options_for_all_cmds "' . &Utils::strip($params{'custom_qsub_options_for_all_cmds'}) .'"';
     }
+    print OUT ' --logfile-directory ' . $logdir; #Pass the logfile directory on to msg.pl
     
-	print OUT " || exit 100\n";
+	 print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRunU0-1.sh");
     $params{'parent1'} .= '.msg.updated.fasta';
@@ -131,8 +137,9 @@ if (exists $params{'parent2_reads'}) {
     if ($params{'custom_qsub_options_for_all_cmds'}) {
         print OUT ' --custom_qsub_options_for_all_cmds "' . &Utils::strip($params{'custom_qsub_options_for_all_cmds'}) .'"';
     }
+    print OUT ' --logfile-directory ' . $logdir; #Pass the logfile directory on to msg.pl
     
-	print OUT " || exit 100\n";
+	 print OUT " || exit 100\n";
     close OUT;
     &Utils::system_call("chmod 755 msgRunU0-2.sh");
     $params{'parent2'} .= '.msg.updated.fasta';
