@@ -38,6 +38,9 @@ my %default_params = (
 
 my $params = Utils::parse_config('update.cfg', \%default_params);
 
+#Create a logfile directory for detailed logging:
+&Utils::system_call("mkdir -p logs.$$");
+
 my $logdir = "logs.$$"; #This variable can be used in update.cfg within any of the cluster submission option strings
 #e.g. for Slurm, submit_cmd might be "sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr"
 #This would output the msgRun* STDOUT and STDERR logs into the $logdir directory.
