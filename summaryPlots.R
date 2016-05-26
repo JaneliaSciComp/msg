@@ -21,21 +21,21 @@ dir <- opts$d
 thinfac <- as.numeric(opts$t)
 difffac <- as.numeric(opts$f)
 pna.thresh <- as.numeric(opts$n)
-contigs <- unlist(strsplit(opts$c,split=","))
-contigs2plot <- unlist(strsplit(opts$p,split=","))
+contigs <- as.character(unlist(strsplit(opts$c,split=","))); #Require that scaffold names be strings
+contigs2plot <- as.character(unlist(strsplit(opts$p,split=",")));
 
 chrLengths <- read.csv("msg.chrLengths", row.names=1)
-chrLengths <- structure(chrLengths$length, names=rownames(chrLengths))
+chrLengths <- structure(chrLengths$length, names=as.character(rownames(chrLengths)))
 
 if (opts$c=="all") {
-	contigs <- names(chrLengths)
+	contigs <- as.character(names(chrLengths));
 } else {
 	#contigs <- contigs[contigs %in% names(chrLengths)]
 	contigs <- names(chrLengths)[match(contigs,names(chrLengths),nomatch="0")]
 	contigs <- contigs[chrLengths[contigs] > 0]
 }
 
-if (opts$p=="all") contigs2plot <- names(chrLengths)
+if (opts$p=="all") contigs2plot <- as.character(names(chrLengths))
 
 
 imagedir <- sprintf("%s_images", dir)

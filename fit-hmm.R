@@ -34,14 +34,14 @@ cat("one.site.per.read has been set to", one.site.per.read, "\n")
 minCoverage <- 0;
 
 contigLengths <- read.csv("msg.chrLengths",header=T,sep=",",as.is=T);
-contigs <- sort(as.vector(contigLengths$chr))
+contigs <- as.character(sort(as.vector(contigLengths$chr))); #Require that scaffold names be strings (don't auto-typecaste some names to integers)
 rownames(contigLengths) <- contigLengths$chr
 
-main.contigs <- unlist(strsplit(opts$c,split=","))
-plot.contigs <- unlist(strsplit(opts$y,split=","))
+main.contigs <- as.character(unlist(strsplit(opts$c,split=","))); #Require that scaffold names be strings
+plot.contigs <- as.character(unlist(strsplit(opts$y,split=","))); #Require that scaffold names be strings
 if(opts$c == "all") main.contigs <- contigs;
 if(opts$y == "all") plot.contigs <- contigs;
-sex.chroms <- unlist(strsplit(opts$x,split=","))
+sex.chroms <- as.character(unlist(strsplit(opts$x,split=","))); #Require that scaffold names be strings
 if(opts$x == "all") sex.chroms <- contigs; #Account for haplodiploid species
 
 aveSpace <- sum(as.numeric(contigLengths[contigLengths$chr %in% plot.contigs,]$length)) / length(plot.contigs)
@@ -171,6 +171,10 @@ for(indiv in indivs) {
     if(file.exists(hmmdata.file)) {
         cat("HMM fit for indiv", indiv, "already exists\n")
         dataa <- read.object(hmmdata.file)
+        #Add names to elements of the dataa list if they are missing:
+        if (is.null(names(dataa)) && length(dataa) == length(contigs)) {
+            names(dataa) = as.character(contigs)
+        }
         ## next
     } 
     else {
