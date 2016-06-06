@@ -69,6 +69,7 @@ print "array_job_variable:     ", $params{'array_job_variable'}, "\n";
 print "array_job_depend_arg:   ", $params{'array_job_depend_arg'}, "\n";
 
 my $jobname = '';
+my $logdir = $params{'logdir'}; #Quick bugfix for people that use $logdir in their msg.cfg
 
 #Collect the individuals from the barcode file:
 open(BARCODE, "<", $params{'barcodes'}) or die "Error: Could not open barcodes file.\n";
