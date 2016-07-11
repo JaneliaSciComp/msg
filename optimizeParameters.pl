@@ -25,11 +25,11 @@ my %default_params = (
    gff_thresh_conf => '0.95',
    one_site_per_contig => '1',
    pepthresh => '',
-   logdir => 'optimize_logs.$$',
+   logdir => qq(optimize_logs.$$),
    cluster => '0',
    barcodes_per_job => 1,
    msgrun2_submit_options => '',
-   submit_cmd => 'sbatch -J ${jobname} -o $params{\'logdir\'}/${jobname}.stdout -e $params{\'logdir\'}/${jobname}.stderr',
+   submit_cmd => q(sbatch -J ${jobname} -o $params{'logdir'}/${jobname}.stdout -e $params{'logdir'}/${jobname}.stderr),
    array_job_arg => '--array=',
    array_job_variable => '$SLURM_ARRAY_TASK_ID',
    array_job_depend_arg => '-d afterok:'
@@ -103,7 +103,7 @@ if ($params{'cluster'}) {
 }
 print FIT 'for (my $i = 0; $i < $barcodes_per_job; $i++) {', "\n",
 '   print "$indiv\n";', "\n",
-'   `bash ${src}/fitParentalHMM.sh',
+'   `bash ', $src, '/fitParentalHMM.sh',
 ' -b ', $params{'barcodes'},
 ' -o hmm_data',
 ' -R hmm_fit',
@@ -129,10 +129,15 @@ $jobname = "fitHMMpartitions";
 my ($jobidline, $jobid) = ('', '');
 if ($params{'cluster'}) {
    my $array_size = ceil(@indivs/$params{'barcodes_per_job'});
-   $jobidline = `$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'}1-${array_size} ./fitHMMpartitions.pl`;
-   $jobidline =~ /\d+/;
-   $jobid = $1;
-   print "fitHMMpartitions.pl submitted as job ${jobid}.\n";
+   my $cmd = eval "qq($params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'}1-${array_size} ./fitHMMpartitions.pl)";
+   $jobidline = `$cmd 2>&1`;
+   if ($jobidline =~ /\d+/) {
+      print $jobidline;
+      $jobid = $1;
+      print "fitHMMpartitions.pl submitted as job ${jobid}.\n";
+   } else {
+      die "fitHMMpartitions.pl failed to submit\n";
+   }
 } else {
    `./fitHMMpartitions.pl`;
 }
@@ -141,7 +146,7 @@ if ($params{'cluster'}) {
 open(SEGERR, ">", "plotSegCalcError.pl");
 print SEGERR '#!/usr/bin/env perl', "\n",
 'print "Plotting segregation for both parents:";', "\n",
-'`Rscript ${src}/plotSegregation.R',
+'`Rscript ', $src, '/plotSegregation.R',
 ' -d hmm_fit',
 ' -c ', $params{'chroms'},
 ' -p ', $params{'chroms2plot'},
@@ -157,10 +162,14 @@ close(SEGERR);
 $jobname = "plotSegCalcError";
 if ($params{'cluster'}) {
    die "Error: Could not read job ID properly for fitHMMpartitions.pl, so did not submit plotSegCalcError.pl.\n" if $jobid eq '';
-   $jobidline = `$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_depend_arg'} ${jobid} ./plotSegCalcError.pl`;
-   $jobidline =~ /\d+/;
-   $jobid = $1;
-   print "plotSegCalcError.pl submitted as job ${jobid}.\n";
+   my $cmd = eval "qq($params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_depend_arg'} ${jobid} ./plotSegCalcError.pl)";
+   $jobidline = `$cmd 2>&1`;
+   if ($jobidline =~ /\d+/) {
+      $jobid = $1;
+      print "plotSegCalcError.pl submitted as job ${jobid}.\n";
+   } else {
+      die "plotSegCalcError.pl failed to submit\n";
+   }
 } else {
    `./plotSegCalcError.pl`;
 }
