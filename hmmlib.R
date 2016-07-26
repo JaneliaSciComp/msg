@@ -151,7 +151,8 @@ read.data <- function(dir, indiv, contig) {
     f <- sprintf("%s/%s/%s-%s.hmmdata", dir, indiv, indiv, contig)
     if (file.exists(f)==T) {
 		cat("Reading data from", f, "\n")
-    	read.delim(f, header=TRUE, as.is=TRUE, na.strings="", quote="") ### need to eliminate quoting b/c of QVs
+      #Add in colClasses to account for rare edge cases of all Fs in quals column interpreted as FALSEs:
+    	read.delim(f, header=TRUE, as.is=TRUE, na.strings="", quote="", colClasses=c("numeric", rep("character", 4), rep("numeric", 5), rep("character", 3))) ### need to eliminate quoting b/c of QVs
     } else { cat(paste("missing",f)); }
 }
 
