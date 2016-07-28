@@ -569,7 +569,11 @@ plot.rf.ded <- function (z, pos, type="imageplot", zmax=12, info, ...) {
     }
     if(type != "n") {
         spectrumf <- rev
-        col <- c("lightgray", spectrumf(rainbow(256, start = 0, end = 2/3, gamma = 0.6)))
+        if ('gamma' %in% names(formals(rainbow))) { 
+            col <- c("lightgray", spectrumf(rainbow(256, start = 0, end = 2/3, gamma = 0.6)))
+        } else {
+            col <- c("lightgray", spectrumf(rainbow(256, start = 0, end = 2/3)))
+        }
         ## col <- c("lightgray", spectrumf(rainbow(256, start = 1/3, end = 1, gamma = 0.6)))
         br <- c(-1, seq(-1e-06, zmax, length = 257))
     }
