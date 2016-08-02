@@ -45,9 +45,23 @@ get.ancestry.probs <- function(ancestry, thinfac, difffac, contigs2use, pna.thre
     pp
 }
 
+genomeplot <- function(y, ...) {
+    plot(x=info$genomepos, y=y, type="l", bty="n", xaxt="n", xlab="", ...)
+    abline(v=info$boundaries, lty=2, col="blue")
+    axis(side=1, at=info$boundaries, labels=FALSE, tick=TRUE)
+    axis(side=1, at=info$midpoints, labels=names(info$midpoints), tick=FALSE, las=2)
+}
+
 #Plot par1 segregation:
 pp1 <- get.ancestry.probs("par1", thinfac=1, difffac=0, contigs2use=contigs2plot, type="plot") #pp1 never used
 p1 <- do.call("cbind", pp1) #p1 never used
+
+contig.lengths <- sapply(pp1, ncol)
+contig.fac <- factor(rep(contigs, contig.lengths))
+current_contigs <- levels(contig.fac)[match(contigs,levels(contig.fac),nomatch="0")]
+
+pos <- as.integer(colnames(p1))
+info <- contig.info(pos, contig.fac, chrLengths[current_contigs])
 rm(pp1);
 ##
 ## Segregation proportions
@@ -62,6 +76,13 @@ rm(p1);
 #Plot par2 segregation:
 pp2 <- get.ancestry.probs("par2", thinfac=1, difffac=0, contigs2use=contigs2plot, type="plot")
 p2 <- do.call("cbind", pp2)
+
+contig.lengths <- sapply(pp2, ncol)
+contig.fac <- factor(rep(contigs, contig.lengths))
+current_contigs <- levels(contig.fac)[match(contigs,levels(contig.fac),nomatch="0")]
+
+pos <- as.integer(colnames(p2))
+info <- contig.info(pos, contig.fac, chrLengths[current_contigs])
 rm(pp2); #Reduce memory consumption
 ##
 ## Segregation proportions
