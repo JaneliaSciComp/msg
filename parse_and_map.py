@@ -12,7 +12,8 @@
 ##0.2.5 have used provide full name of genome
 ##0.2.6 add option to map a subset of individuals
 ##0.3.0 Dan: use CommandLineApp class with ability to take all input parameters on command line
-__version__ = '0.3.0'
+##0.3.1 PFR: Added support for BWA-MEM mapping
+__version__ = '0.3.1'
 
 import subprocess
 import sys, os
@@ -70,7 +71,7 @@ class ParseAndMap(CommandLineApp):
         op.add_option('-p', '--parse-only', dest='parse_only', default=False, action='store_true',
                       help='Just parse data?')
 
-        op.add_option('--bwa_alg', dest='bwa_alg', type='string', default="aln", 
+        op.add_option('--bwa_alg', dest='bwa_alg', type='string', default='aln', 
                       help='Algorithm for BWA mapping. Use aln or bwasw. This is ignored is use_stampy is 1.')
 
         op.add_option('--bwa_threads', dest='bwa_threads', type='int', default=1, 
@@ -610,6 +611,22 @@ class ParseAndMap(CommandLineApp):
                 file_par1_sam.wait()
                 file_par2_sam.wait()
 
+            elif self.options.bwa_alg == 'mem': #Added BWA-MEM support
+                #Align reads to par1:
+                file_par1_sam = open(aln_par1_sam, 'w')
+                file_par1_sam = subprocess.Popen(['bwa',
+                    'mem', '-t ' + str(self.options.bwa_threads), parent1, fastq_file],
+                    stdout=file_par1_sam, stderr=file_par1_log)
+                
+                #Align reads to par2:
+                file_par2_sam = open(aln_par2_sam, 'w')
+                file_par2_sam = subprocess.Popen(['bwa',
+                    'mem', '-t ' + str(self.options.bwa_threads), parent2, fastq_file],
+                    stdout=file_par2_sam, stderr=file_par2_log)
+                    
+                #Wait until both mapping processes are complete
+                file_par1_sam.wait()
+                file_par2_sam.wait()
             else:
                 raise ValueError("Not using stampy and invalid bwa_alg option: %s. Use aln or bwasw" % self.options.bwa_alg)
    
