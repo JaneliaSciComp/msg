@@ -355,7 +355,7 @@ class App(CommandLineApp):
                     indels = len([tuple for tuple in read['par1'].cigar if tuple[0] in cigar_indel_op_indices]) > 0 or
                         len([tuple for tuple in read['par2'].cigar if tuple[0] in cigar_indel_op_indices]) > 0
                 
-                AS_XS_threshold = 5 #Empirically estimated from Dsim data?
+                AS_XS_threshold = 6 #Empirically estimated from Dsim data?
                 #AS is Alignment Score of primary alignment
                 #XS is alignment Score of suboptimal or unchosen alternate alignment
                 #If these two values are too close, it indicates the locus is probably a repeat
