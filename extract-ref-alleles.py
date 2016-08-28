@@ -352,7 +352,7 @@ class App(CommandLineApp):
                 try: #Newer pysam provides CIGAR string as .cigarstring
                     indels = cigar_indel_chars in read['par1'].cigarstring or cigar_indel_chars in read['par2'].cigarstring
                 except:
-                    indels = len([tuple for tuple in read['par1'].cigar if tuple[0] in cigar_indel_op_indices]) > 0 or
+                    indels = len([tuple for tuple in read['par1'].cigar if tuple[0] in cigar_indel_op_indices]) > 0 or \
                         len([tuple for tuple in read['par2'].cigar if tuple[0] in cigar_indel_op_indices]) > 0
                 
                 AS_XS_threshold = 6 #Empirically estimated from Dsim data?
