@@ -152,4 +152,13 @@ sub readFasta {
     return %reads;  
 }
 
+sub wrap_cmdline { #Derived from Princeton CSES code
+    my ($script, $cmdline) = @_;
+    
+    open (OUT,">$script");
+    print OUT "#!/bin/bash\n" . $cmdline . " || exit 100\n";
+    close OUT;
+    &Utils::system_call("chmod 755 $script");
+}
+
 1; #Perl requires this for importing a module
