@@ -246,7 +246,7 @@ if ($params{'msgRun1'}) { #Make msgRun1 optional
     if ($params{'cluster'} != 0) {
 #    &Utils::system_call("qsub -N msgRun1.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n ./msgRun1.sh") ; 
         $jobname = "msgRun1.$$";
-        $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./msgRun1.$$.sh");
+        $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./msgRun1.$$.sh}");
         $jobid = trim($jobid);
         if ($params{'verbose'}) { #Added minor verbosity
             print "Submitted $jobname (jobid $jobid)";
@@ -269,7 +269,7 @@ if ($params{'msgRun2'}) { #Make msgRun2 optional
       if ($params{'msgRun1'}) {
          $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'depend_arg'} $params{'array_job_arg'} 1-${array_size} ./msgRun2.$$.sh}");
       } else {
-         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'} 1-${array_size} ./msgRun2.$$.sh");
+         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'} 1-${array_size} ./msgRun2.$$.sh}");
       }
       $jobid = trim($jobid);
       $prev_jobname = $jobname;
@@ -311,7 +311,7 @@ if ($params{'cluster'} != 0) {
       &Utils::wrap_cmdline("$jobname.sh", "python msg/combine.py -d hmm_fit");
 #      &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/combine.py -d hmm_fit");
    }
-   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $params{'array_job_depend_arg'} $jobname.sh") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $jobname.sh}");
+   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $params{'array_job_depend_arg'} $jobname.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $jobname.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
