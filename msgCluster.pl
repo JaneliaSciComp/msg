@@ -115,7 +115,7 @@ close OUT;
 
 ####################################################################################################
 ### Parsing
-open (OUT,'>msgRun1.$$.sh');
+open (OUT,">msgRun1.$$.sh");
 print OUT "/bin/hostname\n/bin/date\n",
     'perl msg/msg.pl ',
     ' --barcodes ' . $params{'barcodes'},
@@ -173,7 +173,7 @@ print "num barcodes is $num_barcodes!\n";
 
 # Note we include some parsing parameters here since the new style parser operates
 # at the begining of msgRun2.
-open (OUT,'>msgRun2.$$.sh');
+open (OUT,">msgRun2.$$.sh");
 
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
 if ($params{'cluster'}) {
