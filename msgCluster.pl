@@ -116,7 +116,7 @@ close OUT;
 ####################################################################################################
 ### Parsing
 open (OUT,">msgRun1.$$.sh");
-print OUT "/bin/hostname\n/bin/date\n",
+print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
     'perl msg/msg.pl ',
     ' --barcodes ' . $params{'barcodes'},
     ' --re_cutter ' . $params{'re_cutter'},
