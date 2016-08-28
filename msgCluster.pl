@@ -144,7 +144,7 @@ if ($params{'new_parser_filter_out_seq'}) {
 if ($params{'index_file'} && $params{'index_barcodes'}) {
     print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
 }
-print OUT ' --logfile-directory ' . $logdir;
+print OUT ' --logfile_directory ' . $logdir;
 print OUT " || exit 100\n";
     
 close OUT;

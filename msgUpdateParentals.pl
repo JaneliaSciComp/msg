@@ -148,7 +148,7 @@ if (exists $params{'parent2_reads'}) {
     if ($params{'custom_qsub_options_for_all_cmds'}) {
         print OUT ' --custom_qsub_options_for_all_cmds "' . &Utils::strip($params{'custom_qsub_options_for_all_cmds'}) .'"';
     }
-    print OUT ' --logfile-directory ' . $logdir; #Pass the logfile directory on to msg.pl
+    print OUT ' --logfile_directory ' . $logdir; #Pass the logfile directory on to msg.pl
     
 	 print OUT " || exit 100\n";
     close OUT;
