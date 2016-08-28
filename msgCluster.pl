@@ -115,8 +115,8 @@ close OUT;
 
 ####################################################################################################
 ### Parsing
-open (OUT,'>msgRun1.sh');
-print OUT '/bin/hostname\n/bin/date\n',
+open (OUT,'>msgRun1.$$.sh');
+print OUT "/bin/hostname\n/bin/date\n",
     'perl msg/msg.pl ',
     ' --barcodes ' . $params{'barcodes'},
     ' --re_cutter ' . $params{'re_cutter'},
@@ -148,7 +148,7 @@ print OUT ' --logfile_directory ' . $logdir;
 print OUT " || exit 100\n";
     
 close OUT;
-&Utils::system_call("chmod 755 msgRun1.sh");
+&Utils::system_call("chmod 755 msgRun1.$$.sh");
 
 ### Replace barcodes file if using Illumina indexing since we will now have num indexes * num barcodes 
 ### barcoded individuals from parsing step
@@ -173,7 +173,7 @@ print "num barcodes is $num_barcodes!\n";
 
 # Note we include some parsing parameters here since the new style parser operates
 # at the begining of msgRun2.
-open (OUT,'>msgRun2.sh');
+open (OUT,'>msgRun2.$$.sh');
 
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
 if ($params{'cluster'}) {
@@ -229,7 +229,7 @@ if ($params{'cluster'}) {
 }
         
 close OUT;
-&Utils::system_call("chmod 755 msgRun2.sh");
+&Utils::system_call("chmod 755 msgRun2.$$.sh");
 
 
 ####################################################################################################
@@ -255,7 +255,7 @@ if ($params{'msgRun1'}) { #Make msgRun1 optional
         $prev_jobid = $jobid;
     }
     else {
-       &Utils::system_call("./msgRun1.sh > logs.$$/msgRun1.$$.stdout 2> logs.$$/msgRun1.$$.stderr") ; 
+       &Utils::system_call("./msgRun1.$$.sh > logs.$$/msgRun1.$$.stdout 2> logs.$$/msgRun1.$$.stderr") ; 
     }
 }
 
@@ -366,7 +366,7 @@ if ($params{'cluster'} != 0) {
 #            );
    }
 } else { 
-   &Utils::system_call("./msgRun2.sh > logs.$$/msgRun2.$$.stdout 2> logs.$$/msgRun2.$$.stderr");
+   &Utils::system_call("./msgRun2.$$.sh > logs.$$/msgRun2.$$.stdout 2> logs.$$/msgRun2.$$.stderr");
    &Utils::system_call("python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'} > logs.$$/create_stats.$$.stdout 2> logs.$$/create_stats.$$.stderr");
    if ($params{'pepthresh'} ne '') {
        &Utils::system_call("python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv > logs.$$/hmmprob_to_est.$$.stdout 2> logs.$$/hmmprob_to_est.$$.stderr");
