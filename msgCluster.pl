@@ -5,6 +5,12 @@ use File::Basename;
 use lib qw(./msg .);
 use Utils;
 
+sub trim { #Derived from Princeton CSES code
+    my $s = $_[0];
+    ($s) = $s =~ /^[a-zA-Z ]*(\d+[\w[\].-]*)/;
+    return $s;        
+}
+
 print "\nMSG\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
 printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$sec;
