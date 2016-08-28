@@ -42,6 +42,7 @@ plot.contigs <- unlist(strsplit(opts$y,split=","))
 if(opts$c == "all") main.contigs <- contigs;
 if(opts$y == "all") plot.contigs <- contigs;
 sex.chroms <- unlist(strsplit(opts$x,split=","))
+if(opts$x == "all") sex.chroms <- contigs; #Account for haplodiploid species
 
 aveSpace <- sum(as.numeric(contigLengths[contigLengths$chr %in% plot.contigs,]$length)) / length(plot.contigs)
 plotPadding <- 10^(ceiling(log10(aveSpace))-2)
@@ -375,7 +376,7 @@ for(indiv in indivs) {
         mtext(side=1,at=current_start,contig,font=2,cex=.8,line=1,xpd=T,adj=0)
         current_end <- current_start + contigLengths[contigLengths$chr == contig,"length"] - 1;
 
-        if(sex == "male" && contig == "X") {
+        if(sex == "male" && contig %in% sex.chroms) {
             ploidy <- 1
             ancestries <- c("par1","par2")
             par1homo_col <- 1;
