@@ -186,7 +186,7 @@ if ($params{'cluster'}) {
 #        "start=\$SGE_TASK_ID\n\n",
 #        "let end=\"\$start + \$SGE_TASK_STEPSIZE - 1\"\n\n",
 #Generalized case for Slurm and qsub:
-   print OUT "let start=\"(($params{'array_job_variable'} - 1\"\n",
+   print OUT "let start=\"(($params{'array_job_variable'} - 1) * $params{'barcodes_per_job'}) + 1\"\n",
         "let max_arrayid=\"\$start + $params{'barcodes_per_job'} - 1\"\n",
         "end=\"\$((\$max_arrayid<$num_barcodes?\$max_arrayid:$num_barcodes))\"\n",
         "for ((h=\$start; h<=\$end; h++)); do\n",
