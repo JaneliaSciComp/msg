@@ -223,7 +223,7 @@ if ($params{'cluster'}) {
    ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
    ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
    ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
-   ' --logfile-directory ' . $logdir;
+   ' --logfile_directory ' . $logdir;
 if ($params{'cluster'}) {
    print OUT " || exit 100\ndone\n";
 }
