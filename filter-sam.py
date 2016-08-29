@@ -77,7 +77,7 @@ class SamFilter(CommandLineApp):
                     except:
                         par_AS_XS_diff = read.opt('AS')-read.opt('XS')
                         
-                    non_repetitive = par_AS_XS_diff <= AS_XS_threshold
+                    non_repetitive = par_AS_XS_diff > AS_XS_threshold
                     #Only allow read that do not map to repetitive regions:
                     ok = non_repetitive
                 elif bwa_alg == 'aln':

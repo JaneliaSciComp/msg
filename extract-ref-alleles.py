@@ -363,7 +363,7 @@ class App(CommandLineApp):
                     par1_AS_XS_diff = read['par1'].opt('AS')-read['par1'].opt('XS')
                     par2_AS_XS_diff = read['par2'].opt('AS')-read['par2'].opt('XS')
                 
-                non_repetitive = par1_AS_XS_diff <= AS_XS_threshold and par2_AS_XS_diff <= AS_XS_threshold
+                non_repetitive = par1_AS_XS_diff > AS_XS_threshold and par2_AS_XS_diff > AS_XS_threshold
                 #Only allow reads that lack indels and do not map to repetitive regions:
                 ok = not indels and non_repetitive
                 
