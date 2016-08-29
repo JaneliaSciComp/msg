@@ -71,15 +71,13 @@ class SamFilter(CommandLineApp):
                     #XS = alignment score for Suboptimal alignments
                     #MAPQ=0 also implies multiple mapping for BWA, but only if scores are same
                     #i.e. if scores of multiple hits are diff., MAPQ is small, but not 0
-                    AS_XS_threshold = 5 #Empirically estimated from Dsim data?
+                    AS_XS_threshold = 6 #Empirically estimated from Dsim data?
                     try: #If pysam is recent, opt method is deprecated, use get_tag instead
-                        par1_AS_XS_diff = read['par1'].get_tag('AS')-read['par1'].get_tag('XS')
-                        par2_AS_XS_diff = read['par2'].get_tag('AS')-read['par2'].get_tag('XS')
+                        par_AS_XS_diff = read.get_tag('AS')-read.get_tag('XS')
                     except:
-                        par1_AS_XS_diff = read['par1'].opt('AS')-read['par1'].opt('XS')
-                        par2_AS_XS_diff = read['par2'].opt('AS')-read['par2'].opt('XS')
+                        par_AS_XS_diff = read.opt('AS')-read.opt('XS')
                         
-                    non_repetitive = par1_AS_XS_diff <= AS_XS_threshold and par2_AS_XS_diff <= AS_XS_threshold
+                    non_repetitive = par_AS_XS_diff <= AS_XS_threshold
                     #Only allow read that do not map to repetitive regions:
                     ok = non_repetitive
                 elif bwa_alg == 'aln':
