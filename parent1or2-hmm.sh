@@ -76,7 +76,7 @@ indivdir=$outdir/$indiv
     [ -e $indivdir/aln_${indiv}_par2-filtered.sam ] || [ -e $indivdir/aln_${indiv}_par2-filtered.sam.gz ] || {
 
     #If $max_mapped_reads is specified, truncate sam files (preserving headers if any)
-    if [ $max_mapped_reads != "null" ]
+    if [ -n "$max_mapped_reads" ]
     then
         echo "Truncating sam files ${samdir}/aln_${indiv}_par1.sam ${samdir}/aln_${indiv}_par2.sam"
         if [ -e $samdir/aln_${indiv}_par1.sam ]
