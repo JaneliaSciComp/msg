@@ -61,10 +61,15 @@ class App(CommandLineApp):
             help='Was STAMPY used to generate SAM files? Set this to 1.')
 
     def open_as_pysam(self, filepath):
-        try:
+        try: #Newer pysam deprecates Samfile object in favour of AlignmentFile object
             return pysam.Samfile(filepath, 'r')
-        except:
+        except IOError:
             return pysam.Samfile(filepath + '.gz','r')
+        except AttributeError:
+            try:
+                return pysam.AlignmentFile(filepath, 'r')
+            except IOError:
+                return pysam.AlignmentFile(filepath + '.gz', 'r')
 
     @trace
     def remove_non_matching_reads(self, sim_samfilepath, sec_samfilepath, delete_original_files=False):
@@ -74,8 +79,13 @@ class App(CommandLineApp):
         sim_reads, sec_reads = dict(), dict()
 
         sim_samfile_in = self.open_as_pysam(sim_samfilepath)
-        for read in sim_samfile_in.fetch():
-            sim_reads[read.qname] = sim_reads.setdefault(read.qname,0) + 1
+
+        for read in sim_samfile_in.fetch(until_eof=True):  #Newer pysam requires until_eof=True for SAM files, older ignores it
+            try: #Newer pysam deprecates .qname in favour of .query_name
+                sim_reads[read.query_name] = sim_reads.setdefault(read.query_name,0) + 1
+            except:
+                sim_reads[read.qname] = sim_reads.setdefault(read.qname,0) + 1
+                
         #Close and later re-open input files to save memory and because I don't
         #seem to have access to the seek method in the pysam files to reset the fetch.
         sim_samfile_in.close()
@@ -83,8 +93,12 @@ class App(CommandLineApp):
         gc.collect()
                                 
         sec_samfile_in = self.open_as_pysam(sec_samfilepath)
-        for read in sec_samfile_in.fetch():
-            sec_reads[read.qname] = sec_reads.setdefault(read.qname,0) + 1
+        for read in sec_samfile_in.fetch(until_eof=True): #Newer pysam requires until_eof=True for SAM files, older ignores it
+            try: #Newer pysam deprecates .qname in favour of .query_name
+                sec_reads[read.query_name] = sec_reads.setdefault(read.query_name,0) + 1
+            except:
+                sec_reads[read.qname] = sec_reads.setdefault(read.qname,0) + 1
+                
         sec_samfile_in.close()
         del sec_samfile_in
         gc.collect()
@@ -93,35 +107,58 @@ class App(CommandLineApp):
         print "Found %s reads in sim file" % len(sim_reads)
         print "Found %s reads in sec file" % len(sec_reads)
         print "Found %s reads common to both files" % len(both)
-
+        
         #write out only those in both
-
+        
         sim_samfile_in = self.open_as_pysam(sim_samfilepath)
         sim_orig_header = sim_samfile_in.header
         out_sim_samfilepath = sim_samfilepath + '.noncommon.reads.removed.sam'
-        sim_outfile = pysam.Samfile(out_sim_samfilepath, 'wh', template=sim_samfile_in,
-            header=sim_orig_header)
-        for read in sim_samfile_in.fetch():
-            if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
-                sim_outfile.write(read)
-            else:
-                sim_removed_count +=1
+        try: #Newer pysam deprecates Samfile object in favour of AlignmentFile object
+            sim_outfile = pysam.Samfile(out_sim_samfilepath, 'wh', template=sim_samfile_in,
+                header=sim_orig_header)
+        except AttributeError:
+            sim_outfile = pysam.AlignmentFile(out_sim_samfilepath, 'wh', template=sim_samfile_in,
+                header=sim_orig_header)
+        
+        for read in sim_samfile_in.fetch(until_eof=True): #Newer pysam requires until_eof=True for SAM files, older ignores it
+            try: #Newer pysam deprecates .qname in favour of .query_name
+                if read.query_name in both and (sim_reads[read.query_name] == 1 and sec_reads[read.query_name] == 1):
+                    sim_outfile.write(read)
+                else:
+                    sim_removed_count += 1
+            except AttributeError:
+                if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
+                    sim_outfile.write(read)
+                else:
+                    sim_removed_count +=1
+            
         sim_samfile_in.close()
         del sim_samfile_in
         sim_outfile.close()
         del sim_outfile
         gc.collect()
-
+        
         sec_samfile_in = self.open_as_pysam(sec_samfilepath)
         sec_orig_header = sec_samfile_in.header
         out_sec_samfilepath = sec_samfilepath + '.noncommon.reads.removed.sam'
-        sec_outfile = pysam.Samfile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
-            header=sec_orig_header)
-        for read in sec_samfile_in.fetch():
-            if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
-                sec_outfile.write(read)
-            else:
-                sec_removed_count +=1       
+        try: #Newer pysam deprecates Samfile object in favour of AlignmentFile object
+            sec_outfile = pysam.AlignmentFile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
+                header=sec_orig_header)
+        except AttributeError:
+            sec_outfile = pysam.Samfile(out_sec_samfilepath, 'wh', template=sec_samfile_in,
+                header=sec_orig_header)
+        for read in sec_samfile_in.fetch(until_eof=True): #Newer pysam requires until_eof=True for SAM files, older ignores it
+            try: #Newer pysam deprecates .qname in favour of .query_name
+                if read.query_name in both and (sim_reads[read.query_name] == 1 and sec_reads[read.query_name] == 1):
+                    sec_outfile.write(read)
+                else:
+                    sec_removed_count += 1
+            except AttributeError:
+                if read.qname in both and (sim_reads[read.qname] == 1 and sec_reads[read.qname] == 1):
+                    sec_outfile.write(read)
+                else:
+                    sec_removed_count +=1 
+            
         sec_samfile_in.close()
         del sec_samfile_in
         sec_outfile.close()
@@ -131,7 +168,7 @@ class App(CommandLineApp):
         del sim_reads
         gc.collect()
         
-        print "Removed %s simulans reads and %s seculans reads" % (sim_removed_count, sec_removed_count)
+        print "Removed %s par1 reads and %s par2 reads" % (sim_removed_count, sec_removed_count)
         
         #Don't delete original since it would prevent us from re-running
         #if delete_original_files:
@@ -144,7 +181,7 @@ class App(CommandLineApp):
     def main(self):
 
         print "\n",get_free_memory(), "mB of free memory at program start"
-        print "Conversing Memory mode: %s" % str(CONSERVE_MEMORY)
+        print "Conserving Memory mode: %s" % str(CONSERVE_MEMORY)
 
         #Clear out refs dir if it exists, create it if it doesn't
         #(It's important to delete any existing files because we open them to write
@@ -202,10 +239,16 @@ class App(CommandLineApp):
             print bcolors.FAIL + 'ERROR in extract-ref-alleles: %s does not exist!' % self.refsdir + bcolors.ENDC
             sys.exit(2)
 
-        sim_outfile = pysam.Samfile(os.path.join(self.options.outdir, sim_outfilename),
-                                    'w', template=sim_samfile)
-        sec_outfile = pysam.Samfile(os.path.join(self.options.outdir, sec_outfilename),
-                                    'w', template=sec_samfile)
+        try: #Newer pysam deprecates Samfile object in favour of AlignmentFile object
+            sim_outfile = pysam.Samfile(os.path.join(self.options.outdir, sim_outfilename),
+                                        'w', template=sim_samfile)
+            sec_outfile = pysam.Samfile(os.path.join(self.options.outdir, sec_outfilename),
+                                        'w', template=sec_samfile)
+        except:
+            sim_outfile = pysam.AlignmentFile(os.path.join(self.options.outdir, sim_outfilename),
+                                        'w', template=sim_samfile)
+            sec_outfile = pysam.AlignmentFile(os.path.join(self.options.outdir, sec_outfilename),
+                                        'w', template=sec_samfile)
 
         #initialize xxx_refs data structures to an empty dict
         print bcolors.OKBLUE + 'Opened SAM files for processing' + bcolors.ENDC;
@@ -215,7 +258,7 @@ class App(CommandLineApp):
         orths = copy.deepcopy(refs)
 
         #Warning: this only iterates to the shortest of the combined lists
-        both_samfiles = izip(sim_samfile.fetch(), sec_samfile.fetch())
+        both_samfiles = izip(sim_samfile.fetch(until_eof=True), sec_samfile.fetch(until_eof=True)) #Newer pysam requires until_eof=True for SAM files, older ignores it
 
         species = ['par1','par2']
         refsp = ['par1','par2'] ## species for which reference allele information is being extracted from MD
@@ -241,8 +284,12 @@ class App(CommandLineApp):
             if not i % 1e5: print i
             i += 1
             #Optimization: Store these values once instead of re-calc each use
-            par1_rname = read['par1'].rname
-            par2_rname = read['par2'].rname
+            try: #Newer pysam deprecates .rname in favour of .reference_id
+                par1_rname = read['par1'].reference_id
+                par2_rname = read['par2'].reference_id
+            except:
+                par1_rname = read['par1'].rname
+                par2_rname = read['par2'].rname
             par1_flag = read['par1'].flag
             par2_flag = read['par2'].flag            
 
@@ -252,17 +299,32 @@ class App(CommandLineApp):
             if chroms != ['all'] and ref not in chroms: continue
 
             if not (par1_flag in omit_flags and par2_flag in omit_flags):
-                if verbosity: print 'read %d %s flags (parent1: %d, parent2: %d) not in {0,16}: omitting' % (
-                    i, read['par1'].qname, par1_flag, par2_flag)
+                if verbosity:
+                    try: #Newer pysam deprecates .qname in favour of .query_name
+                        print 'read %d %s flags (parent1: %d, parent2: %d) not in {0,16}: omitting' % (
+                        i, read['par1'].query_name, par1_flag, par2_flag)
+                    except:
+                        print 'read %d %s flags (parent1: %d, parent2: %d) not in {0,16}: omitting' % (
+                        i, read['par1'].qname, par1_flag, par2_flag)
+                
                 continue
             if par1_flag == 4 or par2_flag == 4: continue
 
-            seq_forward = dict(zip(species, [Seq(read[sp].seq, IUPAC.ambiguous_dna) for sp in species]))
+            try: #Newer pysam deprecates .seq in favour of .query_sequence
+                seq_forward = dict(zip(species, [Seq(read[sp].query_sequence, IUPAC.ambiguous_dna) for sp in species]))
+            except:
+                seq_forward = dict(zip(species, [Seq(read[sp].seq, IUPAC.ambiguous_dna) for sp in species]))
             if par2_flag != par1_flag:
                 seq_forward['par2'] = seq_forward['par2'].reverse_complement()
 
             if str(seq_forward['par1']) != str(seq_forward['par2']):
-                print read.qname
+                #Output the read that has identical name but different sequence from itself between parental files:
+                try:
+                    print read['par1'].query_name
+                    print read['par2'].query_name
+                except:
+                    print read['par1'].qname
+                    print read['par2'].qname
                 print seq_forward['par1']
                 print seq_forward['par2']
                 raise Exception('Reads on line %d differ' % i)
@@ -272,12 +334,63 @@ class App(CommandLineApp):
                 #For SAM files generated from BWASW or STAMPY algorithms we don't get the same tags.  
                 #For now let reads through regardless of one best match or no suboptimal matches
                 ok = True
+            elif bwa_alg == 'mem':
+                #SAM files generated by BWA-MEM do not get the same X* tags as produced by BWA-aln.
+                #We can use the AS and XS tags to check for repetitive mapping, and the CIGAR string
+                # to check for indels.
+                #AS = Alignment Score for reported alignment
+                #XS = alignment score for Suboptimal alignments
+                #MAPQ=0 also implies multiple mapping for BWA, but only if scores are same
+                #i.e. if scores of multiple hits are diff., MAPQ is small, but not 0
+                
+                #If CIGAR contains I or D characters, there is an indel
+                cigar_indel_chars = ['I', 'D']
+                cigar_indel_op_indices = [1, 2]
+                try: #Newer pysam provides CIGAR string as .cigarstring
+                    indels = cigar_indel_chars in read['par1'].cigarstring or cigar_indel_chars in read['par2'].cigarstring
+                except:
+                    indels = len([tuple for tuple in read['par1'].cigar if tuple[0] in cigar_indel_op_indices]) > 0 or \
+                        len([tuple for tuple in read['par2'].cigar if tuple[0] in cigar_indel_op_indices]) > 0
+                
+                AS_XS_threshold = 6 #Empirically estimated from Dsim data?
+                #AS is Alignment Score of primary alignment
+                #XS is alignment Score of suboptimal or unchosen alternate alignment
+                #If these two values are too close, it indicates the locus is probably a repeat
+                try: #If pysam is recent, opt method is deprecated, use get_tag instead
+                    par1_AS_XS_diff = read['par1'].get_tag('AS')-read['par1'].get_tag('XS')
+                    par2_AS_XS_diff = read['par2'].get_tag('AS')-read['par2'].get_tag('XS')
+                except:
+                    par1_AS_XS_diff = read['par1'].opt('AS')-read['par1'].opt('XS')
+                    par2_AS_XS_diff = read['par2'].opt('AS')-read['par2'].opt('XS')
+                
+                non_repetitive = par1_AS_XS_diff > AS_XS_threshold and par2_AS_XS_diff > AS_XS_threshold
+                #Only allow reads that lack indels and do not map to repetitive regions:
+                ok = not indels and non_repetitive
+                
             else:
-                try:
+                try: #Try with newer pysam method .get_tag() and attribute .cigartuples
+                    one_best_match = read['par1'].get_tag('X0') == 1 and read['par2'].get_tag('X0') == 1
+                    no_suboptimal_matches = False
+                    try:
+                        no_suboptimal_matches = read['par1'].get_tag('X1') == 0 and read['par2'].get_tag('X1') == 0
+                    except:
+                        no_suboptimal_matches = read['par1'].get_tag('XT') == 'U' and read['par2'].get_tag('XT') == 'U'
+                    mds_same = read['par1'].get_tag('MD') == read['par2'].get_tag('MD')
+                    cigars_same = read['par1'].cigartuples == read['par2'].cigartuples #Note: Newer pysam deprecates .cigar in favour of .cigartuples
+                    both_species_same = read['par1'].get_tag('NM') == 0 and read['par2'].get_tag('NM') == 0
+                    if both_species_same:
+                        assert(mds_same and cigars_same), "mds and cigars not the same"
+                    indels = any([read[sp].get_tag('XO') > 0 or read[sp].get_tag('XG') > 0 for sp in species])
+                    ok = one_best_match and no_suboptimal_matches
+
+                except (KeyError, AssertionError), e:
+                    print 'Possible tag missing: %s %s' % (read['par1'].qname, e)
+                    ok = False
+                except: #Account for newer pysam, where opt is deprecated and replaced by get_tag
                     one_best_match = read['par1'].opt('X0') == 1 and read['par2'].opt('X0') == 1
                     no_suboptimal_matches = False
                     try: no_suboptimal_matches = read['par1'].opt('X1') == 0 and read['par2'].opt('X1') == 0
-                    except: no_suboptimal_matches = read['par1'].opt('XT')=='U' and read['par1'].opt('XT')=='U'                    
+                    except: no_suboptimal_matches = read['par1'].opt('XT')=='U' and read['par2'].opt('XT')=='U'                    
                     mds_same          = read['par1'].opt('MD') == read['par2'].opt('MD')
                     cigars_same       = read['par1'].cigar == read['par2'].cigar
                     both_species_same = read['par1'].opt('NM') == 0 and read['par2'].opt('NM') == 0
@@ -285,23 +398,30 @@ class App(CommandLineApp):
                     indels            = any([read[sp].opt('XO') > 0 or read[sp].opt('XG') > 0 for sp in species])
                     ok = one_best_match and no_suboptimal_matches
 
-                except (KeyError, AssertionError), e:
-                    print 'Possible tag missing: %s %s' % (read['par1'].qname, e)
-                    ok = False
-
             if ok:
                 sim_outfile.write(read['par1'])
                 sec_outfile.write(read['par2'])
                 
                 #Fill in the refs and orths dicts
-                record_reference_alleles(
-                    refs['par1'][ref], refs['par2'][ref], 
-                    orths['par1'][ref], orths['par2'][ref], 
-                    read['par1'], read['par2'], 
-                    seq_forward['par1'], 
-                    ref_seqs['par1'][par2ref['par1']].seq, ref_seqs['par2'][par2ref['par2']].seq, 
-                    par2ref['par1'], par2ref['par2'], 
-                    verbosity)
+                try: #Newer pysam deprecates .seq in favour of .query_sequence
+                    record_reference_alleles(
+                        refs['par1'][ref], refs['par2'][ref],
+                        orths['par1'][ref], orths['par2'][ref],
+                        read['par1'], read['par2'],
+                        seq_forward['par1'],
+                        ref_seqs['par1'][par2ref['par1']].query_sequence, ref_seqs['par2'][par2ref['par2']].query_sequence,
+                        par2ref['par1'], par2ref['par2'],
+                        verbosity)
+                except:
+                    record_reference_alleles(
+                        refs['par1'][ref], refs['par2'][ref], 
+                        orths['par1'][ref], orths['par2'][ref], 
+                        read['par1'], read['par2'], 
+                        seq_forward['par1'], 
+                        ref_seqs['par1'][par2ref['par1']].seq, ref_seqs['par2'][par2ref['par2']].seq, 
+                        par2ref['par1'], par2ref['par2'], 
+                        verbosity)
+                    
   
             if (not i % OFFLOAD_MEM_EVERY_N_READS):
                 #print "At ref num %s. free memory is %s mB" % (i, get_free_memory())
@@ -424,33 +544,58 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
     reference genome for which the contig and position information are
     being taken.'''
 
-    pos = sim_read.pos + 1
-    ref_pos = read.pos + 1
+    try: #Newer pysam deprecates .pos in favour of .reference_start
+        pos = sim_read.reference_start + 1
+        ref_pos = read.reference_start + 1
+    except:
+        pos = sim_read.pos + 1
+        ref_pos = read.pos + 1
 
     revComp_flag = 0
     if sim_read.flag != read.flag and (read.flag == 16 or sim_read.flag == 16): 
         revComp_flag = 1
-        ref_pos = read.pos + len(read.seq)
+        try: #Newer pysam deprecates .seq in favour of .query_sequence and .pos in favour of .reference_start
+            ref_pos = read.reference_start + len(read.query_sequence)
+        except:
+            ref_pos = read.pos + len(read.seq)
 
-    cigar_ops = read.cigar
-    cigar_ops_sim = sim_read.cigar
+    try: #Newer pysam deprecates .cigar in favour of .cigartuples
+        cigar_ops = read.cigartuples
+        cigar_ops_sim = sim_read.cigartuples
+    except:
+        cigar_ops = read.cigar
+        cigar_ops_sim = sim_read.cigar
 
-    if verbosity: 
-        print "\n\n" + "*" * 100 + "\n" + str(sim_read.qname) + "\n" + "*" * 100 + "\n"
-        print "*** SIM_READ ***"
-        print sim_read.cigar
-        print cigar_ops_sim
-        print "*** READ ***"
-        print read.cigar
-        print cigar_ops
-        print "\n*** READ INFO ***\nORIG ref_pos %d" % ref_pos
+    if verbosity:
+        try: #Newer pysam deprecates .qname in favour of .query_name, and .cigar in favour of .cigartuples
+            print "\n\n" + "*" * 100 + "\n" + str(sim_read.query_name) + "\n" + "*" * 100 + "\n"
+            print "*** SIM_READ ***"
+            print sim_read.cigartuples
+            print cigar_ops_sim
+            print "*** READ ***"
+            print read.cigartuples
+            print cigar_ops
+            print "\n*** READ INFO ***\nORIG ref_pos %d" % ref_pos
+        except:
+            print "\n\n" + "*" * 100 + "\n" + str(sim_read.qname) + "\n" + "*" * 100 + "\n"
+            print "*** SIM_READ ***"
+            print sim_read.cigar
+            print cigar_ops_sim
+            print "*** READ ***"
+            print read.cigar
+            print cigar_ops
+            print "\n*** READ INFO ***\nORIG ref_pos %d" % ref_pos
 
     if revComp_flag==1: 
         if verbosity: 
             print "reversing order"
             print cigar_ops
-        cigar_ops = tuple(reversed(read.cigar))
-        #cigar_ops_sim = tuple(reversed(sim_read.cigar))
+        try: #Newer pysam deprecates .cigar in favour of .cigartuples
+            cigar_ops = tuple(reversed(read.cigartuples))
+            #cigar_ops_sim = tuple(reversed(sim_read.cigartuples))
+        except:
+            cigar_ops = tuple(reversed(read.cigar))
+            #cigar_ops_sim = tuple(reversed(sim_read.cigar))
         if verbosity: print cigar_ops
 
         for (op, op_len) in cigar_ops:
@@ -463,10 +608,16 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
 
     ####################################################################################################
     if verbosity: print "\n*** UPDATING SIM READ ***\n" + "#####"*10
-    sim_ref_seq,read_like_sim = updateRefRead(sim_read.qname, cigar_ops_sim, seq_forward, 0, verbosity, "+")
+    try: #Newer pysam deprecates .qname in favour of .query_name
+        sim_ref_seq,read_like_sim = updateRefRead(sim_read.query_name, cigar_ops_sim, seq_forward, 0, verbosity, "+")
+    except:
+        sim_ref_seq,read_like_sim = updateRefRead(sim_read.qname, cigar_ops_sim, seq_forward, 0, verbosity, "+")
 
     if verbosity: print "\n*** UPDATING SEC READ ***\n" + "#####"*10
-    ref_seq,read_like_sec = updateRefRead(read.qname, cigar_ops, seq_forward, revComp_flag, verbosity, "*")
+    try: #Newer pysam deprecates .qname in favour of .query_name
+        ref_seq,read_like_sec = updateRefRead(read.query_name, cigar_ops, seq_forward, revComp_flag, verbosity, "*")
+    except:
+        ref_seq,read_like_sec = updateRefRead(read.qname, cigar_ops, seq_forward, revComp_flag, verbosity, "*")
 
     if verbosity: print "\n_____FINAL COMPARISON_____\nread     %s\nsim      %s\nlike_sim %s\nsec      %s\nlike_sec %s" % (seq_forward,sim_ref_seq,read_like_sim,ref_seq,read_like_sec)
     if verbosity and len(sim_ref_seq) != len(ref_seq): print "\n_____CHECK ME_____"
@@ -474,14 +625,26 @@ def record_reference_alleles(alleles_par1, alleles_par2, orths_par1, orths_par2,
     ##################################################
     ### DETERMINE REF ALLELE AND ORTHOLOG
     deletions = re.compile(r"-")
-    end_pos = sim_read.pos + len(sim_ref_seq) - len(deletions.findall(str(sim_ref_seq)))
-    end_ref_pos = read.pos + len(ref_seq) - len(deletions.findall(str(ref_seq)))
+    try: #Newer pysam deprecates .pos in favour of .reference_start
+        end_pos = sim_read.reference_start + len(sim_ref_seq) - len(deletions.findall(str(sim_ref_seq)))
+        end_ref_pos = read.reference_start + len(ref_seq) - len(deletions.findall(str(ref_seq)))
+    except:
+        end_pos = sim_read.pos + len(sim_ref_seq) - len(deletions.findall(str(sim_ref_seq)))
+        end_ref_pos = read.pos + len(ref_seq) - len(deletions.findall(str(ref_seq)))
 
-    if verbosity: print("\n*** DETERMINE DIFFS ***\nrevComp_flag %s\npar1_pos %d / read_pos %d - %d\nread   %s\nsimref %s\nrefseq %s\nsimref %s\nsecref %s\nsec_rc %s\n" % 
-        (str(revComp_flag),pos,ref_pos,end_ref_pos,seq_forward,sim_ref_seq,ref_seq,
-        str(par1_ref_seq[sim_read.pos:end_pos]),
-        str(par2_ref_seq[read.pos:end_ref_pos]),
-        str(par2_ref_seq[read.pos:end_ref_pos].reverse_complement())))
+    if verbosity:
+        try: #Newer pysam deprecates .pos in favour of .reference_start
+            print("\n*** DETERMINE DIFFS ***\nrevComp_flag %s\npar1_pos %d / read_pos %d - %d\nread   %s\nsimref %s\nrefseq %s\nsimref %s\nsecref %s\nsec_rc %s\n" % 
+                (str(revComp_flag),pos,ref_pos,end_ref_pos,seq_forward,sim_ref_seq,ref_seq,
+                str(par1_ref_seq[sim_read.reference_start:end_pos]),
+                str(par2_ref_seq[read.reference_start:end_ref_pos]),
+                str(par2_ref_seq[read.reference_start:end_ref_pos].reverse_complement())))
+        except:
+            print("\n*** DETERMINE DIFFS ***\nrevComp_flag %s\npar1_pos %d / read_pos %d - %d\nread   %s\nsimref %s\nrefseq %s\nsimref %s\nsecref %s\nsec_rc %s\n" % 
+                (str(revComp_flag),pos,ref_pos,end_ref_pos,seq_forward,sim_ref_seq,ref_seq,
+                str(par1_ref_seq[sim_read.pos:end_pos]),
+                str(par2_ref_seq[read.pos:end_ref_pos]),
+                str(par2_ref_seq[read.pos:end_ref_pos].reverse_complement())))
 
     index_sim = 0
     index_ref = 0

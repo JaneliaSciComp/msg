@@ -112,9 +112,9 @@ sub readFasta {
     
     my $file_handle;
     my %reads;
-    my ($read,$seq);
+    my ($header,$seq);
     
-    if ($file =~ /\.gz$/ || $file =~ /\.gzip$/) {        
+    if ($file =~ /\.gz$/ || $file =~ /\.gzip$/) { #Handles gzipped FASTA files (could handle more universally using try-catch) 
         $file_handle = new IO::Uncompress::Gunzip $file
             or die "gunzip failed: $GunzipError\n";    
     } else {
@@ -125,25 +125,25 @@ sub readFasta {
         chomp $_;
         if ($_ =~ /^>(\S+)/) {
             #If we don't have a previous read to save then something went wrong, check first
-            if ($seq && !$read) {die "Invalid FASTA file: @_";}
+            if ($seq and !defined($header)) {die "Invalid FASTA file: @_";}
             if ($seq) {
                 if ($store_count) {
-                    $reads{$read} = length($seq)
+                    $reads{$header} = length($seq)
                 } else {
-                    $reads{$read} = $seq
+                    $reads{$header} = $seq
                 }            
             }
-            $read = $1;
+            $header = $1; #Grabs the contig/scaffold ID
             $seq = '';
-        } else { $seq .= $_; }
+        } else { $seq .= $_; } #Accumulates the contig/scaffold sequence ignoring line wrapping
     } 
     close $file_handle;
     
-    if ($read) {
+    if ($header) {
         if ($store_count) {
-            $reads{$read} = length($seq)
+            $reads{$header} = length($seq)
         } else {
-            $reads{$read} = $seq
+            $reads{$header} = $seq
         }
     }    
     return %reads;  

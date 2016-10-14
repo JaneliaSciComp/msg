@@ -226,9 +226,7 @@ my %counters_bad = qw(	total 0
 my %counters_bc;  
 foreach my $key (keys %BC_table) {
 	next if ($BC_table{$key} eq 'ignore');
-	foreach my $type qw(
-		linkers RE_seq_mismatch min_seq_length overhang_mismatch bad_codes_addon
-		RE_seq_mismatch.min_seq_length small_insert internal_RE good) {
+	foreach my $type (qw(linkers RE_seq_mismatch min_seq_length overhang_mismatch bad_codes_addon RE_seq_mismatch.min_seq_length small_insert internal_RE good)) {
 		$counters_bc{"$key.$BC_table{$key}"}{$type} = 0;
 	}
 }
