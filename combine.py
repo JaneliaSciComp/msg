@@ -139,8 +139,14 @@ def merge(dir):
     #for each parent
     dp1, dp2 = {}, {}
     for (array, ind, chrom) in input_data_sets(dir):
-        print ind, chrom, len(array), "records"
-        for x in array:
+        array_size = len(numpy.atleast_1d(array))
+        print ind, chrom, array_size, "records"
+        if array_size > 1:
+            for x in array:
+                key = (ind, chrom, int(x['pos']))
+                dp1[key] = x['par1']
+                dp2[key] = x['par2']
+        else:
             key = (ind, chrom, int(x['pos']))
             dp1[key] = x['par1']
             dp2[key] = x['par2']
