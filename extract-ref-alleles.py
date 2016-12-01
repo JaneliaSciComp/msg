@@ -31,7 +31,7 @@ class App(CommandLineApp):
         #self.force_exit = False #enable this when profiling
         
         op = self.option_parser
-        op.set_usage('usage: extract_ref_alleles -i indiv -d samdir -o outdir --parent1 parent1_genome --parent2 parent2_genome --chroms csv_list --verbosity')
+        op.set_usage('usage: extract_ref_alleles -i indiv -d samdir -o outdir --parent1 parent1_genome --parent2 parent2_genome --chroms csv_list --repeat_threshold AS-XS --verbosity')
 
         op.add_option('-i', '--individual', dest='indiv', type='string', default=None, 
                       help='Name of individual. E.g. for sam file aln_indivA6_AACGAG_sec.sam.gz, indiv would be "indivA6_AACGAG"')
@@ -59,6 +59,9 @@ class App(CommandLineApp):
 
         op.add_option('--use_stampy', dest='use_stampy', type='int', default=0, 
             help='Was STAMPY used to generate SAM files? Set this to 1.')
+            
+        op.add_option('--repeat_threshold', dest='AS_XS_threshold', type='int', default=6,
+            help='Minimum difference between top alignment and suboptimal alignment scores to keep')
 
     def open_as_pysam(self, filepath):
         try: #Newer pysam deprecates Samfile object in favour of AlignmentFile object
@@ -355,7 +358,7 @@ class App(CommandLineApp):
                     indels = len([tuple for tuple in read['par1'].cigar if tuple[0] in cigar_indel_op_indices]) > 0 or \
                         len([tuple for tuple in read['par2'].cigar if tuple[0] in cigar_indel_op_indices]) > 0
                 
-                AS_XS_threshold = 6 #Empirically estimated from Dsim data?
+                AS_XS_threshold = self.options.AS_XS_threshold #Default of 6 empirically estimated from Dsim data?
                 #AS is Alignment Score of primary alignment
                 #XS is alignment Score of suboptimal or unchosen alternate alignment
                 #If these two values are too close, it indicates the locus is probably a repeat

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 usage () {
-    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms -w bwaalg -v use_filter_hmmdata_pl
+    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms -w bwaalg -v use_filter_hmmdata_pl -k repeat_threshold
     exit 2
 }
 
@@ -12,33 +12,35 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:j:n:v:l:" opt
+while getopts "a:b:c:e:f:g:h:i:j:k:l:m:n:o:p:q:r:R:s:t:u:v:w:x:y:z:" opt
 do 
   case $opt in
+      a) recRate=$OPTARG ;;
       b) barcodes=$OPTARG ;;
-      s) samdir=$OPTARG ;;
-      o) outdir=$OPTARG ;;
-      R) Routdir=$OPTARG ;;
-      p) parent1=$OPTARG ;;
-      q) parent2=$OPTARG ;;
-      i) indiv=$OPTARG ;;
       c) chroms=$OPTARG ;;
-      x) sexchroms=$OPTARG ;;
-      y) chroms2plot=$OPTARG ;;
+      e) usestampy=$OPTARG ;;
       f) deltapar1=$OPTARG ;;
       g) deltapar2=$OPTARG ;;
-      z) priors=$OPTARG ;;
-      a) recRate=$OPTARG ;;      
-      r) rfac=$OPTARG ;;
-      t) theta=$OPTARG ;;
-      w) bwaalg=$OPTARG ;;
-      e) usestampy=$OPTARG ;;
-      m) gff_thresh_conf=$OPTARG ;;
-      u) one_site_per_contig=$OPTARG ;;
+      i) indiv=$OPTARG ;;
       j) pepthresh=$OPTARG ;;
-      n) max_mapped_reads=$OPTARG ;;
-      v) filter_hmmdata_pl=$OPTARG ;;
+      k) repeatthresh=$OPTARG ;;
       l) read_length=$OPTARG ;;
+      m) gff_thresh_conf=$OPTARG ;;
+      n) max_mapped_reads=$OPTARG ;;
+      o) outdir=$OPTARG ;;
+      p) parent1=$OPTARG ;;
+      q) parent2=$OPTARG ;;     
+      r) rfac=$OPTARG ;;
+      R) Routdir=$OPTARG ;;
+      s) samdir=$OPTARG ;;
+      t) theta=$OPTARG ;;
+      u) one_site_per_contig=$OPTARG ;;
+      v) filter_hmmdata_pl=$OPTARG ;;
+      w) bwaalg=$OPTARG ;;
+      x) sexchroms=$OPTARG ;;
+      y) chroms2plot=$OPTARG ;;
+      z) priors=$OPTARG ;; 
+      
       *) usage ;;
   esac
 done
@@ -137,8 +139,8 @@ indivdir=$outdir/$indiv
     fi
 
     echo "Extracting reference allele information from SAM files for $indiv ($parent1 and $parent2)"
-    echo "python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy"
-    python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy || {
+    echo "python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy --repeat_threshold $repeatthresh"
+    python $src/extract-ref-alleles.py -i $indiv -d $samdir -o $indivdir --parent1 $parent1 --parent2 $parent2 --chroms $chroms --bwa_alg $bwaalg --use_stampy $usestampy --repeat_threshold $repeatthresh || {
         echo "Error during extract-ref-alleles.py for $indiv"
     }
    

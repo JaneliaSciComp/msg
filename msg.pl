@@ -16,7 +16,7 @@ my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $par
     $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa,
     $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate,
     $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds,
-    $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir, $filter_hmmdata, $read_length);
+    $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir, $filter_hmmdata, $read_length, $repeat_threshold);
 
 GetOptions(
     'barcodes|b=s' => \$barcodes,
@@ -70,7 +70,8 @@ GetOptions(
     'max_mapped_reads=s' => \$max_mapped_reads,
     'logfile_directory=s' => \$logdir,
     'filter_hmmdata=i' => \$filter_hmmdata,
-    'read_length=i' => \$read_length
+    'read_length=i' => \$read_length,
+    'repeat_threshold=i' => \$repeat_threshold
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -122,6 +123,7 @@ print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
 print "logfile_directory $logdir\n\n";
 print "filter_hmmdata $filter_hmmdata\n\n";
 print "read_length $read_length\n\n";
+print "repeat_threshold $repeat_threshold\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -437,30 +439,31 @@ if ($parse_or_map eq '--map-only') {
       print "\t$indiv\n";
    
    	&Utils::system_call('bash', "$src/parent1or2-hmm.sh",
+             '-a', $recRate,
    			 '-b', $barcodes,
-   			 '-s', $samfiles_dir,
-   			 '-o', 'hmm_data',
-   			 '-R', 'hmm_fit',
-   			 '-p', $genomes_fa{'parent1'},
-   			 '-q', $genomes_fa{'parent2'},
-   			 '-i', $indiv,
    			 '-c', $chroms,
-   			 '-y', $chroms2plot,
+             '-e', $use_stampy,
    			 '-f', $deltapar1,
    			 '-g', $deltapar2,
-             '-a', $recRate,             
-   			 '-r', $rfac,
-   			 '-x', $sexchroms,
-   			 '-z', $priors,
-   			 '-t', $theta,
-             '-w', $bwa_alg,
-             '-e', $use_stampy,
-             '-m', $gff_thresh_conf,
-             '-u', $one_site_per_contig,
+   			 '-i', $indiv,
              '-j', $pepthresh,
-             '-n', $max_mapped_reads,
-             '-v', $filter_hmmdata,
+             '-k', $repeat_threshold,
              '-l', $read_length,
+             '-m', $gff_thresh_conf,
+             '-n', $max_mapped_reads,
+   			 '-o', 'hmm_data',
+   			 '-p', $genomes_fa{'parent1'},
+   			 '-q', $genomes_fa{'parent2'},             
+   			 '-r', $rfac,
+   			 '-R', 'hmm_fit',
+   			 '-s', $samfiles_dir,
+   			 '-t', $theta,
+             '-u', $one_site_per_contig,
+             '-v', $filter_hmmdata,
+             '-w', $bwa_alg,
+   			 '-x', $sexchroms,
+   			 '-y', $chroms2plot,
+   			 '-z', $priors,
    		  "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
 
    } close BARCODE;
