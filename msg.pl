@@ -12,7 +12,11 @@ my $version = do { local( @ARGV, $/ ) = './msg/version'; <> };
 
 my $src = dirname $0;
 my $update_genomes = $false;
-my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $parent2_genome, $parent1_reads, $parent2_reads, $update_minQV, $min_coverage, $max_coverage_stds, $max_coverage_exceeded_state, $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa, $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate, $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds, $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir);
+my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $parent2_genome, $parent1_reads, $parent2_reads, $update_minQV, $min_coverage, $max_coverage_stds, $max_coverage_exceeded_state,
+    $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa,
+    $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate,
+    $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds,
+    $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir, $filter_hmmdata, $read_length);
 
 GetOptions(
     'barcodes|b=s' => \$barcodes,
@@ -64,7 +68,9 @@ GetOptions(
     'one_site_per_contig=i' => \$one_site_per_contig,
     'pepthresh=s' => \$pepthresh,
     'max_mapped_reads=s' => \$max_mapped_reads,
-    'logfile_directory=s' => \$logdir
+    'logfile_directory=s' => \$logdir,
+    'filter_hmmdata=i' => \$filter_hmmdata,
+    'read_length=i' => \$read_length
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -114,6 +120,8 @@ print "max_mapped_reads $max_mapped_reads\n\n";
 #only update parentals passes this in, so you won't see it on standard msg runs:
 print "custom_qsub_options_for_all_cmds $custom_qsub_options_for_all_cmds\n\n";
 print "logfile_directory $logdir\n\n";
+print "filter_hmmdata $filter_hmmdata\n\n";
+print "read_length $read_length\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -451,6 +459,8 @@ if ($parse_or_map eq '--map-only') {
              '-u', $one_site_per_contig,
              '-j', $pepthresh,
              '-n', $max_mapped_reads,
+             '-v', $filter_hmmdata,
+             '-l', $read_length,
    		  "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
 
    } close BARCODE;

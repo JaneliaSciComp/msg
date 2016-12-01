@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 usage () {
-    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms -w bwaalg
+    echo usage: `basename $0` -b barcodes -s samdir -o outdir -R Routdir -p parent1 -q parent2 -i indiv -c chroms -w bwaalg -v use_filter_hmmdata_pl
     exit 2
 }
 
@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:j:n:" opt
+while getopts "b:s:o:R:p:q:i:c:x:y:f:g:z:a:r:t:h:w:e:m:u:j:n:v:l:" opt
 do 
   case $opt in
       b) barcodes=$OPTARG ;;
@@ -37,6 +37,8 @@ do
       u) one_site_per_contig=$OPTARG ;;
       j) pepthresh=$OPTARG ;;
       n) max_mapped_reads=$OPTARG ;;
+      v) filter_hmmdata_pl=$OPTARG ;;
+      l) read_length=$OPTARG ;;
       *) usage ;;
   esac
 done
@@ -50,6 +52,7 @@ shift $(($OPTIND - 1))
 [ -n "$deltapar2" ] || deltapar2=$deltapar1
 [ -n "$recRate" ] ||   recRate=0
 [ -n "$rfac" ] ||      rfac=.000001
+[ -n "$read_length" ]] || read_length=100
 
 date
 echo "version 0.0"
@@ -166,11 +169,27 @@ if [[ -z $(ls $indivdir | grep '\.hmmdata') ]]; then
    exit 4
 fi
 
+#Filter the hmmdata file before fit-hmm.R if requested:
+if [[ -n "$filter_hmmdata_pl" ]]; then
+   echo "Filtering hmmdata file for ancestry informative markers within 1 read of each other."
+   for hmmdatafile in ${indivdir}/*.hmmdata #There should be an .hmmdata file for each scaffold
+      do
+      if [[ ! $hmmdatafile =~ ".filtered.hmmdata" ]]; then #Make sure we don't enter an infinite loop due to the wildcard in the for loop
+         cmd="perl filter_hmmdata.pl --read_length $read_length ${hmmdatafile}"
+         exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
+         echo $cmd
+         $cmd || echo "Error during filtering of hmmdata file ${hmmdatafile} for $indiv"
+      fi
+   done
+   #If we're filtering the hmmdata file, set one_site_per_contig to 0:
+   one_site_per_contig=0
+fi
+
 
 echo "Fitting HMM for $indiv"
 Rindivdir=$Routdir/$indiv
 [ -d $Rindivdir ] || mkdir -p $Rindivdir
-cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -a $recRate -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta -g $gff_thresh_conf -u $one_site_per_contig -j $pepthresh"
+cmd="Rscript $src/fit-hmm.R -d $outdir -i $indiv -s $sex -o $Routdir -p $deltapar1 -q $deltapar2 -a $recRate -r $rfac -c $chroms -x $sexchroms -y $chroms2plot -z $priors -t $theta -g $gff_thresh_conf -u $one_site_per_contig -j $pepthresh -v $filter_hmmdata_pl"
 
 exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
 echo $cmd

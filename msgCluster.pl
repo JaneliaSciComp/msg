@@ -74,6 +74,8 @@ my %default_params = (
         one_site_per_contig => '1',
         full_summary_plots => '1',
         max_mapped_reads => '',
+        filter_hmmdata => '0',
+        read_length => '100',
         barcodes_per_job => 1, #Allows for parallelization of msgRun2
         submit_cmd => 'qsub -N $jobname -cwd $params{"addl_qsub_option_for_exclusive_node"}$params{"custom_qsub_options_for_all_cmds"}-b y -V -sync n', #Default is for qsub, but can be customized, e.g. for Slurm
         #Example submit_cmd for Slurm: sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr
@@ -229,6 +231,8 @@ if ($params{'cluster'}) {
    ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
    ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
    ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
+   ' --filter_hmmdata ' . $params{'filter_hmmdata'},
+   ' --read_length ' . $params{'read_length'},
    ' --logfile_directory ' . $logdir;
 if ($params{'cluster'}) {
    print OUT " || exit 100\ndone\n";

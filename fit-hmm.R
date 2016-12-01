@@ -25,11 +25,13 @@ gff_thresh_conf <- as.numeric(opts$g) #threshold for generating gff files for Ge
 one_site_per_contig <- as.logical(as.numeric(opts$u))
 recrate <- as.numeric(opts$a)
 # pepthresh <- opts$j
+use_filtered_hmmdata <- as.logical(as.numeric(opts$v))
 
 stopifnot(!is.null(indivs), !is.null(dir), !is.null(outdir), length(indivs) == 1)
 
 one.site.per.read <- one_site_per_contig
 cat("one.site.per.read has been set to", one.site.per.read, "\n")
+if(use_filtered_hmmdata) cat("Using pre-filtered hmmdata file\n")
 
 minCoverage <- 0;
 
@@ -196,14 +198,23 @@ for(indiv in indivs) {
                 cat("MISSING file for CONTIG ", contig, " INDIV ", indiv, "\n")
                 cat(sprintf("%s/%s/%s-%s.hmmdata", dir, indiv, indiv, contig),"\n")
                 next
-            } 
+            }
+            if (use_filtered_hmmdata && !file.exists(sprintf("%s/%s/%s-%s.filtered.hmmdata", dir, indiv, indiv, contig))) {
+                cat("MISSING file for CONTIG ", contig, " INDIV ", indiv, "\n")
+                cat(sprintf("%s/%s/%s-%s.filtered.hmmdata", dir, indiv, indiv, contig),"\n")
+                next
+            }
 
 
-            data <- read.data(dir, indiv, contig)
-            data$read <- factor.contiguous(data$pos)
-            total_sites <- length(unique(data$read));
-            #commented out because this is not number of markers, it is number of contiguous regions
- #           cat("\tRound 2: Total number of markers", total_sites, "\n")
+            if (use_filtered_hmmdata) {
+                data <- read.data(dir, indiv, contig, filtered=TRUE)
+            } else {
+                data <- read.data(dir, indiv, contig)
+                data$read <- factor.contiguous(data$pos)
+                total_sites <- length(unique(data$read));
+                #commented out because this is not number of markers, it is number of contiguous regions
+     #           cat("\tRound 2: Total number of markers", total_sites, "\n")
+            }
 
             ok <- !is.na(data$bad) | !is.na(data$par1ref) & !is.na(data$par2ref) & !is.na(data$cons)
             cat("\tRound 2: Removing", sum(!ok), "sites at which par1/par2/cons allele unknown\n")

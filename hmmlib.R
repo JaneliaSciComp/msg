@@ -147,8 +147,12 @@ make.genotypes <- function(alleles) {
     g
 }
 
-read.data <- function(dir, indiv, contig) {
-    f <- sprintf("%s/%s/%s-%s.hmmdata", dir, indiv, indiv, contig)
+read.data <- function(dir, indiv, contig, filtered=FALSE) {
+    if (filtered) {
+        f <- sprintf("%s/%s/%s-%s.filtered.hmmdata", dir, indiv, indiv, contig)
+    } else {
+        f <- sprintf("%s/%s/%s-%s.hmmdata", dir, indiv, indiv, contig)
+    }
     if (file.exists(f)==T) {
 		cat("Reading data from", f, "\n")
       #Add in colClasses to account for rare edge cases of all Fs in quals column interpreted as FALSEs:
