@@ -12,7 +12,7 @@ die () {
 
 src=$(dirname $0)
 
-while getopts "a:b:c:e:f:g:h:i:j:k:l:m:n:o:p:q:r:R:s:t:u:v:w:x:y:z:" opt
+while getopts "a:b:c:e:f:g:h:i:j:k:l:m:n:o:p:q:r:R:s:S:t:u:v:w:x:y:z:" opt
 do 
   case $opt in
       a) recRate=$OPTARG ;;
@@ -33,6 +33,7 @@ do
       r) rfac=$OPTARG ;;
       R) Routdir=$OPTARG ;;
       s) samdir=$OPTARG ;;
+      S) samtools=$OPTARG ;;
       t) theta=$OPTARG ;;
       u) one_site_per_contig=$OPTARG ;;
       v) filter_hmmdata_pl=$OPTARG ;;
@@ -46,7 +47,7 @@ do
 done
 shift $(($OPTIND - 1))
 
-[ -n "$samdir" ] && [ -n "$outdir" ] && [ -n "$barcodes" ] && [ -n "$parent1" ] && [ -n "$parent2" ] && [ -n "$indiv" ]|| usage
+[ -n "$samdir" ] && [ -n "$outdir" ] && [ -n "$barcodes" ] && [ -n "$parent1" ] && [ -n "$parent2" ] && [ -n "$indiv" ] && [ -n "$samtools" ] || usage
 [ -n "$Routdir" ] || usage
 [ -d $outdir ] || mkdir -p $outdir
 
@@ -54,7 +55,7 @@ shift $(($OPTIND - 1))
 [ -n "$deltapar2" ] || deltapar2=$deltapar1
 [ -n "$recRate" ] ||   recRate=0
 [ -n "$rfac" ] ||      rfac=.000001
-[ -n "$read_length" ]] || read_length=100
+[ -n "$read_length" ] || read_length=100
 
 date
 echo "version 0.0"
@@ -81,7 +82,7 @@ indivdir=$outdir/$indiv
     [ -e $indivdir/aln_${indiv}_par2-filtered.sam ] || [ -e $indivdir/aln_${indiv}_par2-filtered.sam.gz ] || {
 
     #If $max_mapped_reads is specified, truncate sam files (preserving headers if any)
-    if [ -n "$max_mapped_reads" ]
+    if [ "$max_mapped_reads" -gt 0 ]
     then
         echo "Truncating sam files ${samdir}/aln_${indiv}_par1.sam ${samdir}/aln_${indiv}_par2.sam"
         if [ -e $samdir/aln_${indiv}_par1.sam ]
@@ -147,8 +148,8 @@ indivdir=$outdir/$indiv
 }
 
 echo "Creating pileup for $indiv"
-echo "bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2>&1 | grep -vF 'deleted'"
-bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 2>&1 | grep -vF 'deleted'
+echo "bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 -S ${samtools} 2>&1 | grep -vF 'deleted'"
+bash $src/make-pileups.sh -i $indiv -d $indivdir -p $parent1 -q $parent2 -S ${samtools} 2>&1 | grep -vF 'deleted'
 
 #Check for existence of the pileup files:
 if [[ -z $(ls $indivdir | grep '\.pileup') ]]; then
@@ -172,12 +173,12 @@ if [[ -z $(ls $indivdir | grep '\.hmmdata') ]]; then
 fi
 
 #Filter the hmmdata file before fit-hmm.R if requested:
-if [[ -n "$filter_hmmdata_pl" ]]; then
+if [[ "$filter_hmmdata_pl" -gt 0 ]]; then
    echo "Filtering hmmdata file for ancestry informative markers within 1 read of each other."
    for hmmdatafile in ${indivdir}/*.hmmdata #There should be an .hmmdata file for each scaffold
       do
       if [[ ! $hmmdatafile =~ ".filtered.hmmdata" ]]; then #Make sure we don't enter an infinite loop due to the wildcard in the for loop
-         cmd="perl filter_hmmdata.pl --read_length $read_length ${hmmdatafile}"
+         cmd="perl $src/filter_hmmdata.pl --read_length $read_length ${hmmdatafile}"
          exec 3>&1; exec 1>&2; echo $cmd; exec 1>&3 3>&-
          echo $cmd
          $cmd || echo "Error during filtering of hmmdata file ${hmmdatafile} for $indiv"

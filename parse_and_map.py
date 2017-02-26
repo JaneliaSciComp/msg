@@ -94,6 +94,9 @@ class ParseAndMap(CommandLineApp):
                       
         op.add_option('--quality_trim_reads_consec', dest='quality_trim_reads_consec', default=None, type='int',
                       help='Illumina parsing only - Minimum number of consecutive bases passing threshold values')
+        
+        op.add_option('-S', '--samtools_path', dest='samtools_path', default='samtools', type='string', 
+                      help='Path to samtools 0.1.9 including the name of the binary at the end of the string')
 
         #Set divergence for mapping to a foreign reference (note: this is
         #strongly recommended for divergences >3%, as it will automatically
@@ -504,13 +507,13 @@ class ParseAndMap(CommandLineApp):
             subprocess.check_call(['mv %s.fixed %s' % (file_to_fix, file_to_fix)], shell=True,
                 stdout=misc_indiv_log, stderr=misc_indiv_log)    
             #convert to bam to prepare for sorting  
-            subprocess.check_call(['samtools view -btSh -o %s.bam %s' % (file_to_fix, file_to_fix)],
+            subprocess.check_call(['%s view -btSh -o %s.bam %s' % (self.options.samtools_path, file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
             #Do the sort (samtools adds .bam suffix to output FYI)
-            subprocess.check_call(['samtools sort -n %s.bam %s.sorted' % (file_to_fix, file_to_fix)],
+            subprocess.check_call(['%s sort -n %s.bam %s.sorted' % (self.options.samtools_path, file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
             #convert back to SAM
-            subprocess.check_call(['samtools view -h -o %s %s.sorted.bam' % (file_to_fix, file_to_fix)],
+            subprocess.check_call(['%s view -h -o %s %s.sorted.bam' % (self.options.samtools_path, file_to_fix, file_to_fix)],
                 shell=True, stdout=misc_indiv_log, stderr=misc_indiv_log)
             #remove temporary sorting files
             os.remove('%s.bam' % file_to_fix)
@@ -636,8 +639,8 @@ class ParseAndMap(CommandLineApp):
             if self.options.mapq_filter:
                 # remove poor alignments if requested
                 for (sam_file, log_file) in ((aln_par1_sam,file_par1_log), (aln_par2_sam,file_par2_log)):
-                    subprocess.check_call('samtools view -Sh -q %s -o %s.mapq_filtered.sam %s' % (
-                        self.options.mapq_filter ,sam_file, sam_file),
+                    subprocess.check_call('%s view -Sh -q %s -o %s.mapq_filtered.sam %s' % (
+                        self.options.samtools_path, self.options.mapq_filter, sam_file, sam_file),
                         shell=True, stdout=log_file, stderr=log_file)
                     result = subprocess.check_call("%s -f %s %s" % (put_back_command, sam_file + '.mapq_filtered.sam',sam_file), shell=True)
    
@@ -647,7 +650,7 @@ class ParseAndMap(CommandLineApp):
                 #TODO: It might be worth sorting the input files first to speed this up. Measure and test.
                 for (sam_file, parent_, log_file) in ((aln_par1_sam, parent1, file_par1_log),(aln_par2_sam, parent2, file_par2_log)):
                     result = subprocess.check_call(
-                        "samtools calmd -uS %s %s | samtools view -h -o %s -" % (sam_file, parent_, sam_file + '.added_calmd.sam'), 
+                        "%s calmd -uS %s %s | %s view -h -o %s -" % (self.options.samtools_path, sam_file, parent_, self.options.samtools_path, sam_file + '.added_calmd.sam'), 
                         shell=True, stderr=log_file)
                     result = subprocess.check_call("%s -f %s %s" % (put_back_command, sam_file + '.added_calmd.sam',sam_file), shell=True)
 

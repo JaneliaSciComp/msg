@@ -73,10 +73,11 @@ my %default_params = (
         pepthresh => '',
         one_site_per_contig => '1',
         full_summary_plots => '1',
-        max_mapped_reads => '',
+        max_mapped_reads => '0',
         filter_hmmdata => '0',
         read_length => '100',
         AS_XS_threshold => '6',
+        samtools_path => 'samtools',
         barcodes_per_job => 1, #Allows for parallelization of msgRun2
         submit_cmd => 'qsub -N $jobname -cwd $params{"addl_qsub_option_for_exclusive_node"}$params{"custom_qsub_options_for_all_cmds"}-b y -V -sync n', #Default is for qsub, but can be customized, e.g. for Slurm
         #Example submit_cmd for Slurm: sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr
@@ -127,33 +128,34 @@ close OUT;
 open (OUT,">msgRun1.$$.sh");
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
     'perl msg/msg.pl ',
-    ' --barcodes ' . $params{'barcodes'},
-    ' --re_cutter ' . $params{'re_cutter'},
-    ' --linker_system ' . $params{'linker_system'},
-    ' --reads ' . $params{'reads'},
-    ' --bwaindex1 ' . $params{'bwaindex1'},
-    ' --bwaindex2 ' . $params{'bwaindex2'},
-    ' --bwa_alg ' . $params{'bwa_alg'},
-    ' --bwa_threads ' . $params{'bwa_threads'},
-    ' --use_stampy ' . $params{'use_stampy'},
-    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'},
-    ' --parent1 ' . $params{'parent1'},
-    ' --parent2 ' . $params{'parent2'},
-    ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'},
-    ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'},
-    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'},
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
-    ' --new_parser ' . $params{'new_parser'},
-    ' --new_parser_offset ' . $params{'new_parser_offset'},
-    ' --parse_or_map parse-only';
+    ' --barcodes ', $params{'barcodes'},
+    ' --re_cutter ', $params{'re_cutter'},
+    ' --linker_system ', $params{'linker_system'},
+    ' --reads ', $params{'reads'},
+    ' --bwaindex1 ', $params{'bwaindex1'},
+    ' --bwaindex2 ', $params{'bwaindex2'},
+    ' --bwa_alg ', $params{'bwa_alg'},
+    ' --bwa_threads ', $params{'bwa_threads'},
+    ' --use_stampy ', $params{'use_stampy'},
+    ' --stampy_premap_w_bwa ', $params{'stampy_premap_w_bwa'},
+    ' --parent1 ', $params{'parent1'},
+    ' --parent2 ', $params{'parent2'},
+    ' --indiv_stampy_substitution_rate ', $params{'indiv_stampy_substitution_rate'},
+    ' --indiv_mapq_filter ', $params{'indiv_mapq_filter'},
+    ' --quality_trim_reads_thresh ', $params{'quality_trim_reads_thresh'},
+    ' --quality_trim_reads_consec ', $params{'quality_trim_reads_consec'},
+    ' --new_parser ', $params{'new_parser'},
+    ' --new_parser_offset ', $params{'new_parser_offset'},
+    ' --parse_or_map parse-only',
+    ' --samtools_path ', $params{'samtools_path'};
 
 if ($params{'new_parser_filter_out_seq'}) {
-    print OUT ' --new_parser_filter_out_seq ' . $params{'new_parser_filter_out_seq'};
+    print OUT ' --new_parser_filter_out_seq ', $params{'new_parser_filter_out_seq'};
 }
 if ($params{'index_file'} && $params{'index_barcodes'}) {
-    print OUT ' --index_file ' . $params{'index_file'} . ' --index_barcodes ' . $params{'index_barcodes'};
+    print OUT ' --index_file ', $params{'index_file'}, ' --index_barcodes ', $params{'index_barcodes'};
 }
-print OUT ' --logfile_directory ' . $logdir;
+print OUT ' --logfile_directory ', $logdir;
 print OUT " || exit 100\n";
     
 close OUT;
@@ -202,40 +204,41 @@ if ($params{'cluster'}) {
 } else {
    print OUT "perl msg/msg.pl --barcodes $params{'barcodes'}";
 }
-   print OUT ' --reads ' . $params{'reads'},
-   ' --parent1 ' . $params{'parent1'},
-   ' --parent2 ' . $params{'parent2'},
-   ' --chroms ' . $params{'chroms'},
-   ' --sexchroms ' . $params{'sexchroms'},
-   ' --chroms2plot ' . $params{'chroms2plot'},
+   print OUT ' --reads ', $params{'reads'},
+   ' --parent1 ', $params{'parent1'},
+   ' --parent2 ', $params{'parent2'},
+   ' --chroms ', $params{'chroms'},
+   ' --sexchroms ', $params{'sexchroms'},
+   ' --chroms2plot ', $params{'chroms2plot'},
    ' --parse_or_map map-only',
-   ' --deltapar1 ' . $params{'deltapar1'},
-   ' --deltapar2 ' . $params{'deltapar2'},
-   ' --recRate ' . $params{'recRate'},
-   ' --rfac ' . $params{'rfac'},
-   ' --priors ' . $params{'priors'},
-   ' --theta ' . $params{'theta'},
-   ' --bwa_alg ' . $params{'bwa_alg'},
-   ' --bwa_threads ' . $params{'bwa_threads'},
-   ' --use_stampy ' . $params{'use_stampy'},
-   ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'},
-   ' --indiv_stampy_substitution_rate ' . $params{'indiv_stampy_substitution_rate'},
-   ' --indiv_mapq_filter ' . $params{'indiv_mapq_filter'},
-   ' --gff_thresh_conf ' . $params{'gff_thresh_conf'},
-   ' --new_parser ' . $params{'new_parser'},
-   ' --new_parser_offset ' . $params{'new_parser_offset'},
-   ' --re_cutter ' . $params{'re_cutter'},
-   ' --linker_system ' . $params{'linker_system'},
-   ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'},
-   ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'},
-   ' --one_site_per_contig ' . $params{'one_site_per_contig'},
-   ' --new_parser_filter_out_seq ' . ($params{'new_parser_filter_out_seq'} || 'null'),
-   ' --pepthresh ' . ($params{'pepthresh'} || 'null'),
-   ' --max_mapped_reads ' . ($params{'max_mapped_reads'} || 'null'),
-   ' --filter_hmmdata ' . $params{'filter_hmmdata'},
-   ' --read_length ' . $params{'read_length'},
-   ' --repeat_threshold ' . $params{'AS_XS_threshold'},
-   ' --logfile_directory ' . $logdir;
+   ' --deltapar1 ', $params{'deltapar1'},
+   ' --deltapar2 ', $params{'deltapar2'},
+   ' --recRate ', $params{'recRate'},
+   ' --rfac ', $params{'rfac'},
+   ' --priors ', $params{'priors'},
+   ' --theta ', $params{'theta'},
+   ' --bwa_alg ', $params{'bwa_alg'},
+   ' --bwa_threads ', $params{'bwa_threads'},
+   ' --use_stampy ', $params{'use_stampy'},
+   ' --stampy_premap_w_bwa ', $params{'stampy_premap_w_bwa'},
+   ' --indiv_stampy_substitution_rate ', $params{'indiv_stampy_substitution_rate'},
+   ' --indiv_mapq_filter ', $params{'indiv_mapq_filter'},
+   ' --gff_thresh_conf ', $params{'gff_thresh_conf'},
+   ' --new_parser ', $params{'new_parser'},
+   ' --new_parser_offset ', $params{'new_parser_offset'},
+   ' --re_cutter ', $params{'re_cutter'},
+   ' --linker_system ', $params{'linker_system'},
+   ' --quality_trim_reads_thresh ', $params{'quality_trim_reads_thresh'},
+   ' --quality_trim_reads_consec ', $params{'quality_trim_reads_consec'},
+   ' --one_site_per_contig ', $params{'one_site_per_contig'},
+   ' --new_parser_filter_out_seq ', ($params{'new_parser_filter_out_seq'} || 'null'),
+   ' --pepthresh ', ($params{'pepthresh'} || 'null'),
+   ' --max_mapped_reads ', $params{'max_mapped_reads'},
+   ' --filter_hmmdata ', $params{'filter_hmmdata'},
+   ' --read_length ', $params{'read_length'},
+   ' --repeat_threshold ', $params{'AS_XS_threshold'},
+   ' --samtools_path ', $params{'samtools_path'},
+   ' --logfile_directory ', $logdir;
 if ($params{'cluster'}) {
    print OUT " || exit 100\ndone\n";
 }

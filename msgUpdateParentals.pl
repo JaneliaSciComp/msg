@@ -42,6 +42,7 @@ my %default_params = (
         parent1_mapq_filter => '0',
         parent2_mapq_filter => '0',
         debug => '0',
+        samtools_path => 'samtools'
     );
 
 my $params = Utils::parse_config('update.cfg', \%default_params);
@@ -72,27 +73,28 @@ my %params = %$params;
 if (exists $params{'parent1_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
     open (OUT,'>msgRunU0-1.sh');
-    print OUT "/bin/hostname\n/bin/date\n" .
-    'perl msg/msg.pl ' .
-    ' --update ' .
-    ' --parent1 ' . $params{'parent1'} . 
-    ' --update_minQV ' . $params{'update_minQV'} .
-    ' --min_coverage ' . $params{'min_coverage'} .
-    ' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .    
-    ' --parent1-reads ' . $params{'parent1_reads'} .
-    ' --bwaindex1 ' . $params{'bwaindex1'} .
-    ' --bwaindex2 ' . $params{'bwaindex2'} .
-    ' --bwa_alg ' . $params{'bwa_alg'} .
-    ' --bwa_threads ' . $params{'bwa_threads'} .
-    ' --use_stampy ' . $params{'use_stampy'} .
-    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
-    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
-    ' --cluster ' . $params{'cluster'} .
-    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-    ' --parent_stampy_substitution_rate ' . $params{'parent1_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent1_mapq_filter'} .
-    ' --debug ' . $params{'debug'}
+    print OUT "/bin/hostname\n/bin/date\n",
+    'perl msg/msg.pl ',
+    ' --update ',
+    ' --parent1 ', $params{'parent1'}, 
+    ' --update_minQV ', $params{'update_minQV'},
+    ' --min_coverage ', $params{'min_coverage'},
+    ' --max_coverage_exceeded_state ', $params{'max_coverage_exceeded_state'},    
+    ' --parent1-reads ', $params{'parent1_reads'},
+    ' --bwaindex1 ', $params{'bwaindex1'},
+    ' --bwaindex2 ', $params{'bwaindex2'},
+    ' --bwa_alg ', $params{'bwa_alg'},
+    ' --bwa_threads ', $params{'bwa_threads'},
+    ' --use_stampy ', $params{'use_stampy'},
+    ' --stampy_premap_w_bwa ', $params{'stampy_premap_w_bwa'},
+    ' --stampy_pseudo_threads ', $params{'stampy_pseudo_threads'},
+    ' --cluster ', $params{'cluster'},
+    ' --quality_trim_reads_thresh ', $params{'quality_trim_reads_thresh'},
+    ' --quality_trim_reads_consec ', $params{'quality_trim_reads_consec'},
+    ' --parent_stampy_substitution_rate ', $params{'parent1_stampy_substitution_rate'},
+    ' --parent_mapq_filter ', $params{'parent1_mapq_filter'},
+    ' --samtools_path ', $params{'samtools_path'},
+    ' --debug ', $params{'debug'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -116,27 +118,28 @@ if (exists $params{'parent1_reads'}) {
 if (exists $params{'parent2_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
     open (OUT,'>msgRunU0-2.sh');
-    print OUT "/bin/hostname\n/bin/date\n" .
-    'perl msg/msg.pl ' .
-    ' --update ' .
-    ' --parent2 ' . $params{'parent2'} . 
-    ' --update_minQV ' . $params{'update_minQV'} .
-    ' --min_coverage ' . $params{'min_coverage'} .
-    ' --max_coverage_exceeded_state ' . $params{'max_coverage_exceeded_state'} .  
-    ' --parent2-reads ' . $params{'parent2_reads'} .
-    ' --bwaindex1 ' . $params{'bwaindex1'} .
-    ' --bwaindex2 ' . $params{'bwaindex2'} .
-    ' --bwa_alg ' . $params{'bwa_alg'} .
-    ' --bwa_threads ' . $params{'bwa_threads'} .
-    ' --use_stampy ' . $params{'use_stampy'} .
-    ' --stampy_premap_w_bwa ' . $params{'stampy_premap_w_bwa'} .
-    ' --stampy_pseudo_threads ' . $params{'stampy_pseudo_threads'} .
-    ' --cluster ' . $params{'cluster'} .
-    ' --quality_trim_reads_thresh ' . $params{'quality_trim_reads_thresh'} .
-    ' --quality_trim_reads_consec ' . $params{'quality_trim_reads_consec'} .
-    ' --parent_stampy_substitution_rate ' . $params{'parent2_stampy_substitution_rate'} .
-    ' --parent_mapq_filter ' . $params{'parent2_mapq_filter'} .
-    ' --debug ' . $params{'debug'}
+    print OUT "/bin/hostname\n/bin/date\n",
+    'perl msg/msg.pl ',
+    ' --update ',
+    ' --parent2 ', $params{'parent2'},
+    ' --update_minQV ', $params{'update_minQV'},
+    ' --min_coverage ', $params{'min_coverage'},
+    ' --max_coverage_exceeded_state ', $params{'max_coverage_exceeded_state'}, 
+    ' --parent2-reads ', $params{'parent2_reads'},
+    ' --bwaindex1 ', $params{'bwaindex1'},
+    ' --bwaindex2 ', $params{'bwaindex2'},
+    ' --bwa_alg ', $params{'bwa_alg'},
+    ' --bwa_threads ', $params{'bwa_threads'},
+    ' --use_stampy ', $params{'use_stampy'},
+    ' --stampy_premap_w_bwa ', $params{'stampy_premap_w_bwa'},
+    ' --stampy_pseudo_threads ', $params{'stampy_pseudo_threads'},
+    ' --cluster ', $params{'cluster'},
+    ' --quality_trim_reads_thresh ', $params{'quality_trim_reads_thresh'},
+    ' --quality_trim_reads_consec ', $params{'quality_trim_reads_consec'},
+    ' --parent_stampy_substitution_rate ', $params{'parent2_stampy_substitution_rate'},
+    ' --parent_mapq_filter ', $params{'parent2_mapq_filter'},
+    ' --samtools_path ', $params{'samtools_path'},
+    ' --debug ', $params{'debug'}
     ;
     #Add on optional arguments
     if (defined $params{'max_coverage_stds'}) {
@@ -196,7 +199,7 @@ if (exists $params{'parent1_reads'} and exists $params{'parent2_reads'}) {
    }
 }
 
-print "\nNOTE: Output and error messages are located in: msgUpdateParentalsOut.$$ and msgUpdateParentalsError.$$ \n\n";
+print "\nNOTE: Output and error messages are located in: msgUpdateParentalsOut.$$, msgUpdateParentalsError.$$, and $logdir \n\n";
 if (exists $params{'parent1_reads'}) { print "Output file is $params{'parent1'}\n";}
 if (exists $params{'parent2_reads'}) { print "Output file is $params{'parent2'}\n";}
 

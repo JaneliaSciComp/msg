@@ -16,7 +16,9 @@ my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $par
     $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa,
     $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate,
     $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds,
-    $one_site_per_contig, $pepthresh, $max_mapped_reads, $logdir, $filter_hmmdata, $read_length, $repeat_threshold);
+    $one_site_per_contig, $pepthresh, $logdir, $filter_hmmdata, $read_length, $repeat_threshold, $samtools_path);
+    
+my $max_mapped_reads = 0; #Use 0 as default, which skips truncation of SAMs
 
 GetOptions(
     'barcodes|b=s' => \$barcodes,
@@ -67,11 +69,12 @@ GetOptions(
     'custom_qsub_options_for_all_cmds=s' => \$custom_qsub_options_for_all_cmds,
     'one_site_per_contig=i' => \$one_site_per_contig,
     'pepthresh=s' => \$pepthresh,
-    'max_mapped_reads=s' => \$max_mapped_reads,
+    'max_mapped_reads=i' => \$max_mapped_reads,
     'logfile_directory=s' => \$logdir,
     'filter_hmmdata=i' => \$filter_hmmdata,
     'read_length=i' => \$read_length,
-    'repeat_threshold=i' => \$repeat_threshold
+    'repeat_threshold=i' => \$repeat_threshold,
+    'samtools_path=s' => \$samtools_path
     );
 
 #### INTERNAL OPTIONS (for developers) #####
@@ -124,6 +127,7 @@ print "logfile_directory $logdir\n\n";
 print "filter_hmmdata $filter_hmmdata\n\n";
 print "read_length $read_length\n\n";
 print "repeat_threshold $repeat_threshold\n\n";
+print "samtools_path $samtools_path\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -184,7 +188,7 @@ sub run_stampy_on_cluster {
         " --substitutionrate $parent_stampy_substitution_rate" .
         " -o $out.tmp.\${h}.sam" .
         "   || exit 100\n" .
-        "   samtools view -bhS -o $out.tmp.\${h}.bam $out.tmp.\${h}.sam\n" .
+        "   " . $samtools_path . " view -bhS -o $out.tmp.\${h}.bam $out.tmp.\${h}.sam\n" .
         "done\n" .
         "/bin/date\n";
     close OUT;
@@ -203,9 +207,9 @@ sub run_stampy_on_cluster {
     #merge all of the temp files back together
     my @tmp_bam_file_names;
     for (1..$stampy_pseudo_threads) {push(@tmp_bam_file_names, "$out.tmp.$_.bam");}
-    &Utils::system_call("samtools merge $out.stampy.tmp.bam " . join(" ", @tmp_bam_file_names));
+    &Utils::system_call($samtools_path . " merge $out.stampy.tmp.bam " . join(" ", @tmp_bam_file_names));
     #convert back to SAM format
-    &Utils::system_call("samtools view -h -o $out.sam $out.stampy.tmp.bam");
+    &Utils::system_call($samtools_path . " view -h -o $out.sam $out.stampy.tmp.bam");
     
     #delete temp files and qsub rubbish
     if (!$debug) {
@@ -273,7 +277,7 @@ if( $update_genomes ) {
             #Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
             &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, "$genomes_fa{$sp}.msg", "> $logdir/bwaIndex${sp}.msg$$.stdout 2> $logdir/bwaIndex${sp}.msg$$.stderr") 
                 unless( -e "$genomes_fa{$sp}.msg.bwt" and -e "$genomes_fa{$sp}.msg.ann" );
-            &Utils::system_call("samtools", "faidx", "$genomes_fa{$sp}.msg", "> $logdir/samtoolsFaidx${sp}.msg$$.stdout 2> $logdir/samtoolsFaidx${sp}.msg$$.stderr") ;
+            &Utils::system_call($samtools_path, "faidx", "$genomes_fa{$sp}.msg", "> $logdir/samtoolsFaidx${sp}.msg$$.stdout 2> $logdir/samtoolsFaidx${sp}.msg$$.stderr") ;
     
             unless (-e "$out.sam") {
                 if ($use_stampy == 1) {
@@ -314,19 +318,19 @@ if( $update_genomes ) {
             # Filter out unmapped reads, etc
             &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy, "> $logdir/filter-sam${sp}.msg$$.stdout 2> $logdir/filter-sam${sp}.msg$$.stderr") ;
             if ($parent_mapq_filter > 0) {
-                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
+                &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
             }
             else {
-                &Utils::system_call("samtools", "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
+                &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
             }
-            &Utils::system_call("samtools", "sort", "$out.bam", "$out.bam.sorted", "> $logdir/samtoolsSort${sp}.msg$$.stdout 2> $logdir/samtoolsSort${sp}.msg$$.stderr");
+            &Utils::system_call($samtools_path, "sort", "$out.bam", "$out.bam.sorted", "> $logdir/samtoolsSort${sp}.msg$$.stdout 2> $logdir/samtoolsSort${sp}.msg$$.stderr");
             
             if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
                 if ($debug == $true) {
                     &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam");
                 }
                 #Put back in MD tags, bwasw and stampy omit them:
-                &Utils::system_call("samtools", "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam", "2> $logdir/samtoolsCalmd${sp}.msg$$.stderr");
+                &Utils::system_call($samtools_path, "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam", "2> $logdir/samtoolsCalmd${sp}.msg$$.stderr");
                 if ($debug == $true) {
                     #copy instead of move for debug mode so we can view each step
                     &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam");               
@@ -336,9 +340,9 @@ if( $update_genomes ) {
                     &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam");
                 }
             }
-            &Utils::system_call("samtools", "index", "$out.bam.sorted.bam", "> $logdir/samtoolsIndex${sp}.msg$$.stdout 2> $logdir/samtoolsIndex${sp}.msg$$.stderr");
+            &Utils::system_call($samtools_path, "index", "$out.bam.sorted.bam", "> $logdir/samtoolsIndex${sp}.msg$$.stdout 2> $logdir/samtoolsIndex${sp}.msg$$.stderr");
             #When possible, we should be able to switch between pileup and mpileup seamlessly
-            &Utils::system_call("samtools", "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup", "2> $logdir/samtoolsPileup${sp}.msg$$.stderr");
+            &Utils::system_call($samtools_path, "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup", "2> $logdir/samtoolsPileup${sp}.msg$$.stderr");
 
         }
 
@@ -418,6 +422,7 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
         '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug,
         '--new_parser', $new_parser || '0', '--new_parser_offset', $new_parser_offset || '0',
         '--new_parser_filter_out_seq', $new_parser_filter_out_seq || 'null',
+        '--samtools_path', $samtools_path,
         "> $logdir/parseAndMap.msg$$.stdout 2> $logdir/parseAndMap.msg$$.stderr");
 
 ## Strip species out of reference column
@@ -457,6 +462,7 @@ if ($parse_or_map eq '--map-only') {
    			 '-r', $rfac,
    			 '-R', 'hmm_fit',
    			 '-s', $samfiles_dir,
+             '-S', $samtools_path,
    			 '-t', $theta,
              '-u', $one_site_per_contig,
              '-v', $filter_hmmdata,

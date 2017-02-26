@@ -4,7 +4,7 @@
 #!/bin/bash -x
 
 usage () {
-    echo usage: `basename $0` -i indiv -d dir -a all -r range -p parent1 -q parent2
+    echo usage: `basename $0` -i indiv -d dir -a all -r range -p parent1 -q parent2 -S samtools_path
     exit 2
 }
 
@@ -16,7 +16,7 @@ die () {
 all=1
 #Defaults $all to true
 
-while getopts "ai:d:p:q:" opt
+while getopts "ai:d:p:q:S:" opt
 do 
   case $opt in
       i) indiv=$OPTARG ;;
@@ -25,12 +25,13 @@ do
       r) range=$OPTARG ;;
       p) parent1=$OPTARG ;;
       q) parent2=$OPTARG ;;
+      S) samtools=$OPTARG ;;
       *) usage ;;
   esac
 done
 shift $(($OPTIND - 1))
 
-[ -n "$indiv" ] && [ -n "$dir" ] && [ -n "$parent1" ] && [ -n "$parent2" ] || usage
+[ -n "$indiv" ] && [ -n "$dir" ] && [ -n "$parent1" ] && [ -n "$parent2" ] && [ -n "$samtools" ] || usage
 
 species=par1
 [ -e $parent1 ] || die "$parent1 doesn't exist"
@@ -47,17 +48,17 @@ echo "$file"
 
 [ -e $parent1.fai ] || samtools faidx $parent1
 [ -e $file-sorted.bam ] || {
-    echo "samtools view -bt $parent1.fai $file.sam | samtools sort - $file-sorted"
-    samtools view -bt $parent1.fai $file.sam | samtools sort - $file-sorted
+    echo "$samtools view -bt $parent1.fai $file.sam | $samtools sort - $file-sorted"
+    ${samtools} view -bt $parent1.fai $file.sam | ${samtools} sort - $file-sorted
 }
 [ -e $file-sorted.bam.bai ] || samtools index $file-sorted.bam
 
 for ref in $refs ; do
     [ -e $file-$ref-sorted.pileup ] || {
         echo "Making pileup for $species contig $ref"
-        samtools view -bu $file-sorted.bam $ref | samtools sort - $file-$ref-sorted
-        samtools index $file-$ref-sorted.bam
-        samtools pileup -Bcf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
+        ${samtools} view -bu $file-sorted.bam $ref | ${samtools} sort - $file-$ref-sorted
+        ${samtools} index $file-$ref-sorted.bam
+        ${samtools} pileup -Bcf $parent1 $file-$ref-sorted.bam > $file-$ref-sorted.pileup
         rm $file-$ref-sorted.bam $file-$ref-sorted.bam.bai
     }
 done
