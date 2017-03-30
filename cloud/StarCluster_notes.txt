@@ -5,6 +5,7 @@ On the AMI I saved host_setup.sh to /usr/local and ran it with these arguments t
 bash /usr/local/host_setup.sh /usr/local/bin /usr/local
 
 This installs all MSG dependencies directly in /usr/local/bin which will already be on the $PATH for all potential users.  And it installed the latest version of MSG to /usr/local/msg.
+NOTE: Need to install R and dependencies manually.  See comments in host_setup.sh.
 
 I saved the AMI following the instructions in the webpage mentioned above and made the AMI public.
 
@@ -13,19 +14,27 @@ I modified my local .starcluster/config file to reference the new AMI id and lau
 Other Notes:
 
 Doing a test run:
-mkdir /home/sgeadmin/MSG_test; cd /home/sgeadmin/MSG_test; ln -s /usr/local/msg; cp /usr/local/msg/example_MSG_toy/* .
-perl msg/msgUpdateParentals.pl
-perl msg/msgCluster.pl
+# Update ~/.starcluster/config with desired AMI ID
+$ starcluster start mycluster
+$ starcluster sshmaster mycluster
+$ mkdir /home/sgeadmin/MSG_test; cd /home/sgeadmin/MSG_test; ln -s /usr/local/msg; cp /usr/local/msg/example_MSG_toy/* .
+$ perl msg/msgUpdateParentals.pl
+$ perl msg/msgCluster.pl
+$ exit
+$ starcluster terminate mycluster
 
 Updating AMI:
-Follow instructions in above mentioned webpage using the current AMI as the BASE-AMI-ID:
-$ starcluster start -o -s 1 -I r3.large -m ami-14e2517c imagehost
+Follow instructions in above mentioned webpage using the current AMI as the BASE-AMI-ID (shown as ami-1f1ba309 below):
+$ starcluster start -o -s 1 -I m1.large -m ami-1f1ba309 imagehost
 $ starcluster listclusters --show-ssh-status imagehost
 SSH in and make updates.
 $ starcluster sshmaster imagehost
 Save new AMI (use listclusters to get instance id)
 $ starcluster ebsimage <instance id> msg-starclusterv<version>
-Delete old AMI.
-Update docs to reference new AMI
+Delete old AMI on AWS dashboard. (Deregister, then delete its snapshot)
+Make new AMI public on AWS dashboard.
+See Doing a test run above
+$ starcluster terminate imagehost
+Update docs (instructions/MSG_Running_on_the_Cloud.doc) to reference new AMI
 
 

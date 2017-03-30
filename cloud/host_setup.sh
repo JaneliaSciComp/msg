@@ -85,24 +85,22 @@ cp -R ext/ $1
 cp stampy.py $1
 cd $2/msg/dependencies/
 
-#Install R
-apt-get -y install libreadline-dev
-tar xzvf R-2.12.2.tar.gz 
-cd R-2.12.2/
-./configure -prefix=$1/
-make
-make install
-cd $1/bin
-mv * ../
-cd $1
-rm -rf bin
+# Install R Manually for now (Or contact Patrick for a better install script?)
+# This approach worked on Ubuntu Precise
+#codename=$(lsb_release -c -s)
+#echo "deb http://cran.stat.ucla.edu/bin/linux/ubuntu $codename/" | sudo tee -a /etc/apt/sources.list > /dev/null
+#sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9
+#sudo add-apt-repository ppa:marutter/rdev
+#sudo apt-get update
+#sudo apt-get upgrade
+#sudo apt-get install r-base r-base-dev
+##N for Configuration file `/etc/cloud/cloud.cfg' question	
+#sudo apt-get install r-base-core
 
 #Install R Libraries
-R CMD INSTALL $2/msg/dependencies/HiddenMarkov_1.3-1.tar.gz 
-R CMD INSTALL $2/msg/dependencies/zoo_1.6-2.tar.gz 
-R CMD INSTALL $2/msg/dependencies/R.methodsS3_1.2.0.tar.gz 
-R CMD INSTALL $2/msg/dependencies/R.oo_1.7.3.tar.gz 
+# (March 2017) This script worked well to install (zoo no longer required)
+# https://raw.githubusercontent.com/YourePrettyGood/msg/master/check_dependencies_R.R
 
-#Test dependencies
+#Test dependencies (Won't pass without R)
 cd $2/msg
 bash test_dependencies.sh
