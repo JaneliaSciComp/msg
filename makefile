@@ -11,7 +11,7 @@ hmmprobs: hmmprobs.c
 
 samtools: dependencies/samtools-0.1.9.tar.bz2
 	tar -xjf $<
-	cd samtools-0.1.9 && $(MAKE) && printf "Please set samtools_path in your msg.cfg to " && pwd
+	cd samtools-0.1.9 && $(MAKE) && printf "Please set samtools_path in your msg.cfg to " && pwd | tr -d "\n" && printf "/samtools\n"
 
 rpkgs: test_dependencies_R.sh
 	sh $<
