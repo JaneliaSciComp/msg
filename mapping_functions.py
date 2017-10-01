@@ -50,8 +50,8 @@ def create_stats(raw_data, barcodes_file):
     stats_file = open(stats_file_name,'w')
     #print file with statistics of parsing
     total_reads = 0
+    read_file = './'+raw_data+'_parsed/bad_barcodes'
     if os.path.exists(read_file): #Catch the case where the bad_barcodes file wasn't created or copied over to the parsed reads directory
-        read_file = './'+raw_data+'_parsed/bad_barcodes'
         number_reads = count_lines(read_file)/4
         stats_file.write('bad_barcodes\t%s\n' %(number_reads))
         total_reads += number_reads

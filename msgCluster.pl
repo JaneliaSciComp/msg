@@ -7,8 +7,8 @@ use Utils;
 
 sub trim { #Derived from Princeton CSES code
     my $s = $_[0];
-    ($s) = $s =~ /^[a-zA-Z ]*(\d+[\w[\].-]*)/;
-    return $s;        
+    ($s) = $s =~ /^[a-zA-Z ]*<?(\d+[\w[\].-]*)>?/;
+    return $s;
 }
 
 print "\nMSG\n";
@@ -79,15 +79,28 @@ my %default_params = (
         AS_XS_threshold => '6',
         samtools_path => 'samtools',
         barcodes_per_job => 1, #Allows for parallelization of msgRun2
-        submit_cmd => 'qsub -N $jobname -cwd $params{"addl_qsub_option_for_exclusive_node"}$params{"custom_qsub_options_for_all_cmds"}-b y -V -sync n', #Default is for qsub, but can be customized, e.g. for Slurm
-        #Example submit_cmd for Slurm: sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr
-        depend_arg => '-hold_jid $prev_jobname', #Default is for qsub, Slurm's is -d afterok:$prev_jobid
+        submit_cmd => 'qsub -N $jobname -cwd $params{"addl_qsub_option_for_exclusive_node"}$params{"custom_qsub_options_for_all_cmds"}-b y -V -sync n', #Default is for SGE, but can be customized, e.g. for SLURM
+        #Example submit_cmd for SLURM: sbatch -J $jobname -o $logdir/$jobname.%j.stdout -e $logdir/$jobname.%j.stderr
+        #Example submit_cmd for LSF: bsub -J ${jobname} -o ${logdir}/${jobname}.stdout -e ${logdir}/${jobname}.stder
+        depend_arg => '-hold_jid $prev_jobname', #Default is for SGE
+        #Example for SLURM: -d afterok:${prev_jobid}
+        #Example for LSF: -w "done(${prev_jobid})"
         array_job_depend_arg => '-hold_jid $prev_jobname', #Not sure if this is redundant with depend_arg
-        array_job_variable => '$SGE_TASK_ID', #Default is for qsub, Slurm's is $SLURM_ARRAY_TASK_ID
+        #array_job_arg => '-t 1-${array_size}', #Default is for SGE
+        #For SLURM: -a 1-${array_size}
+        #For LSF, things are a bit wonky: -J "${jobname}[1-${array_size}]"
+        #But this may conflict with -J specified in submit_cmd, so not tested
+        array_job_variable => '$SGE_TASK_ID', #Default is for SGE
+        #For SLURM: $SLURM_ARRAY_TASK_ID
+        #For LSF: $LSB_JOBINDEX
         default_submit_options => '', #Leave blank for qsub, use with Slurm, applies to msgRun1, 2a, 2b, and 4-7
-        msgrun2_submit_options => '', #Leave blank for qsub, use with Slurm
-        msgrun3_submit_options => '', #Leave blank for qsub, use with Slurm
-        #Example options for Slurm: -N 1 --ntasks-per-node=1 -t 1:00:00 --mem=4000
+        #PFR might use on SLURM: -N 1 --ntasks-per-node=1 -t 1:00:00 --mem=4000
+        #Stern tested on LSF with: -n 1 -W 60 -M 4000
+        msgrun2_submit_options => '', #Leave blank for SGE, use with Slurm
+        #Be sure to match up # cores (SLURM --cpus-per-task) with # threads above
+        msgrun3_submit_options => '', #Leave blank for SGE, use with Slurm
+        #msgRun3 is single-threaded (R generally is), so set # cores to 1 here
+        #Example options for SLURM: -N 1 --ntasks-per-node=1 -t 1:00:00 --mem=4000
         #This example allocates one node, runs one process per node, with a timeout of 1 hour, and 4 GB RAM.
         verbose => 0,
         msgRun1 => 1, #Optionally run msgRun1, set to 0 to skip
@@ -98,6 +111,12 @@ my %default_params = (
 my $params = Utils::parse_config('msg.cfg', \%default_params);
 Utils::validate_config($params, qw( barcodes reads parent1 parent2 ));
 my %params = %$params;
+
+#Fill in the rest of array_job_arg if only flag provided:
+#e.g. if array_job_arg=-a for SLURM (by checking if it lacks whitespace),
+# append " 1-${array_size}" to array_job_arg
+#Note: Intended for backwards compatibility, and does not apply to LSF
+$params{'array_job_arg'} .= ' 1-${array_size}' unless $params{'array_job_arg'} =~ /\s+/ or $params{'array_job_arg'} eq "";
 
 #Create a logfile directory for detailed logging:
 &Utils::system_call("mkdir -p logs.$$");
@@ -110,7 +129,7 @@ my $logdir = "logs.$$"; #This variable can be used in msg.cfg within any of the 
 ### report their lengths also
 my %par1_reads = &Utils::readFasta($params{'parent1'}, 1);
 my %par2_reads = &Utils::readFasta($params{'parent2'}, 1);
-my @chroms ;
+my @chroms;
 #when people ask to analyze only part of the genome, then the size of the genome
 #changes in the analysis! So, rather than trying to explain all this to end users,
 #we decided to see if we can simply trick msg into always using the full genome size.
@@ -282,9 +301,9 @@ if ($params{'msgRun2'}) { #Make msgRun2 optional
       my $array_size = int((${num_barcodes} + $params{'barcodes_per_job'} - 1) / $params{'barcodes_per_job'});
       $jobname = "msgRun2.$$";
       if ($params{'msgRun1'}) {
-         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'depend_arg'} $params{'array_job_arg'} 1-${array_size} ./msgRun2.$$.sh}");
+         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'depend_arg'} $params{'array_job_arg'} ./msgRun2.$$.sh}");
       } else {
-         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'} 1-${array_size} ./msgRun2.$$.sh}");
+         $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun2_submit_options'} $params{'array_job_arg'} ./msgRun2.$$.sh}");
       }
       $jobid = trim($jobid);
       $prev_jobname = $jobname;
