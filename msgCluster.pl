@@ -321,7 +321,7 @@ if ($params{'cluster'} != 0) {
 #   &Utils::system_call("qsub -N msgRun2a.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
    $jobname = "msgRun2a.$$";
    &Utils::wrap_cmdline("$jobname.sh", "python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
-   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} $jobname.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $jobname.sh}");
+   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
@@ -330,7 +330,7 @@ if ($params{'cluster'} != 0) {
 #       &Utils::system_call("qsub -N msgRun2b.$$ -hold_jid msgRun2.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv");
       $jobname = "msgRun2b.$$";
       &Utils::wrap_cmdline("$jobname.sh", "python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_est.csv");
-      $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} $jobname.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $jobname.sh}");
+      $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./${jobname}.sh}");
       $jobid = trim($jobid);
       if ($params{'verbose'}) {
          print "Submitted $jobname (jobid $jobid)\n";
@@ -345,7 +345,7 @@ if ($params{'cluster'} != 0) {
       &Utils::wrap_cmdline("$jobname.sh", "python msg/combine.py -d hmm_fit");
 #      &Utils::system_call("qsub -N msgRun3.$$ -hold_jid msgRun2.$$ -cwd $params{'addl_qsub_option_for_exclusive_node'}$params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/combine.py -d hmm_fit");
    }
-   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $params{'array_job_depend_arg'} $jobname.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $jobname.sh}");
+   $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
@@ -356,7 +356,7 @@ if ($params{'cluster'} != 0) {
 #   &Utils::system_call("qsub -N msgRun4.$$ -hold_jid msgRun3.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n perl msg/summary_mismatch.pl $params{'barcodes'} 0");
    $jobname = "msgRun4.$$";
    &Utils::wrap_cmdline("$jobname.sh", "perl msg/summary_mismatch.pl $params{'barcodes'} 0");
-   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} $jobname.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
+   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
@@ -367,7 +367,7 @@ if ($params{'cluster'} != 0) {
 #   &Utils::system_call("qsub -N msgRun5.$$ -hold_jid msgRun4.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n python msg/validate.py $params{'barcodes'} $params{'full_summary_plots'}");
    $jobname = "msgRun5.$$";
    &Utils::wrap_cmdline("$jobname.sh", "python msg/validate.py $params{'barcodes'}");
-   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} $jobname.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
+   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
@@ -378,7 +378,7 @@ if ($params{'cluster'} != 0) {
 #   &Utils::system_call("qsub -N msgRun6.$$ -hold_jid msgRun5.$$ -cwd $params{'custom_qsub_options_for_all_cmds'}-b y -V -sync n \"mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; truncate -s0 temp.fq; rm -f $params{'barcodes'}.*\"");
    $jobname = "msgRun6.$$";
    &Utils::wrap_cmdline("$jobname.sh", "mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; truncate -s0 temp.fq; rm -f $params{'barcodes'}.*");
-   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} $jobname.sh}");
+   $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
       print "Submitted $jobname (jobid $jobid)\n";
@@ -389,7 +389,7 @@ if ($params{'cluster'} != 0) {
    if ($params{'email_host'} && $params{'notify_emails'}) {
       $jobname = "msgRun7.$$";
       &Utils::wrap_cmdline("$jobname.sh", "python msg/send_email.py -e $params{'email_host'} -t $params{'notify_emails'} -s \"MSG Run $$ has completed\" -b \"NOTE: Output and error messages are located in msgOut.$$, msgError.$$, and logs.$$\"");
-      $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} $jobname.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
+      $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
       $jobid = trim($jobid);
       if ($params{'verbose'}) {
          print "Submitted $jobname (jobid $jobid)\n";
