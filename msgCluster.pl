@@ -119,7 +119,7 @@ my %params = %$params;
 $params{'array_job_arg'} .= ' 1-${array_size}' unless $params{'array_job_arg'} =~ /\s+/ or $params{'array_job_arg'} eq "";
 
 #Fix to account for use of -J in LSF array jobs:
-my $array_submit_cmd = $submit_cmd;
+my $array_submit_cmd = $params{'submit_cmd'};
 $array_submit_cmd =~ s/-J\s+\S+// if $params{'array_job_arg'} =~ /\s+/;
 
 #Create a logfile directory for detailed logging:
