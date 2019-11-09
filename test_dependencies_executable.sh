@@ -1,27 +1,32 @@
 #!/bin/sh
 
-if ! perl --version >/dev/null 2>/dev/null ; then
+if ! [ -x "$(command -v perl)" ]; then
+#if ! perl --version >/dev/null 2>/dev/null ; then
 	echo "Please install perl somewhere in your PATH"
 	exit 1
 fi
 
-if ! python -V >/dev/null 2>/dev/null ; then
+if ! [ -x "$(command -v python)" ]; then
+#if ! python -V >/dev/null 2>/dev/null ; then
 	echo "Please install python somewhere in your PATH"
 	exit 1
 fi
 
-if ! R --version >/dev/null 2>/dev/null ; then
+if ! [ -x "$(command -v Rscript)" ]; then
+#if ! R --version >/dev/null 2>/dev/null ; then
 	echo "Please install R somewhere in your PATH"
 	exit 1
 fi
 
-if ! which bwa >/dev/null 2>/dev/null ; then
+if ! [ -x "$(command -v bwa)" ]; then
+#if ! which bwa >/dev/null 2>/dev/null ; then
 	echo "Please install bwa somewhere in your PATH"
 	exit 1
 fi
 
-if ! which samtools >/dev/null 2>/dev/null ; then
-	echo "Please install samtools somewhere in your PATH"
+if (! [ -x "$(command -v samtools)" ]) && (! [ -x "samtools-0.1.9/samtools" ]); then
+#if ! which samtools >/dev/null 2>/dev/null ; then
+	echo "Please install samtools somewhere in your PATH and re-install samtools 0.1.9 that came with MSG"
 	exit 1
 fi
 
