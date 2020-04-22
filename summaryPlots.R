@@ -3,10 +3,6 @@
 source(sprintf("%s/ded.R", "msg"))
 source(sprintf("%s/hmmlib.R", "msg"))
 
-plot.correlation.matrix <- TRUE
-write.ancestry.probs <- TRUE
-breakpoint.widths <- FALSE
-
 ## If you are running this code interactively (i.e. separately from a
 ## run of the MSG software) then don't evalue the following line.
 opts <- getopts()
@@ -15,6 +11,10 @@ opts <- getopts()
 ## the 'opts' object will be in the output file for MSG run 3, as a
 ## result of this line:
 cat("Input parameters for summaryPlots.R\nopts <-") ; dput(opts)
+
+plot.correlation.matrix <- opts$l > 0
+write.ancestry.probs <- TRUE
+breakpoint.widths <- FALSE
 
 bc <- opts$b
 dir <- opts$d

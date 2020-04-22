@@ -39,7 +39,7 @@ my %default_params = (
         deltapar1      => '.01',
         deltapar2      => '.01',
         recRate        => '0',
-        rfac		      => '0.00001',
+        rfac          => '0.00001',
         thinfac	      => '1',
         difffac	      => '.01',
         priors         => '0,.5,.5',
@@ -73,6 +73,7 @@ my %default_params = (
         pepthresh => '',
         one_site_per_contig => '1',
         full_summary_plots => '1',
+        plot_lod_matrix => '1',
         max_mapped_reads => '0',
         filter_hmmdata => '0',
         read_length => '100',
@@ -331,7 +332,7 @@ if ($params{'cluster'} != 0) {
    }
    $jobname = "msgRun3.$$";
    if ($params{'full_summary_plots'} == 1) {
-      &Utils::wrap_cmdline("$jobname.sh", "Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'}");
+      &Utils::wrap_cmdline("$jobname.sh", "Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'}");
    }
    else {
       &Utils::wrap_cmdline("$jobname.sh", "python msg/combine.py -d hmm_fit");

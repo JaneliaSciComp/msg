@@ -25,8 +25,7 @@ if ! [ -x "$(command -v bwa)" ]; then
 fi
 
 if (! [ -x "$(command -v samtools)" ]) && (! [ -x "samtools-0.1.9/samtools" ]); then
-#if ! which samtools >/dev/null 2>/dev/null ; then
-	echo "Please install samtools somewhere in your PATH and re-install samtools 0.1.9 that came with MSG"
+	echo "Please install samtools 0.1.9 that came with MSG using the Makefile"
 	exit 1
 fi
 
