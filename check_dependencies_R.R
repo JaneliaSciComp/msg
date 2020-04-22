@@ -1,7 +1,7 @@
 options <- commandArgs()
 MSG_directory <- dirname(substring(options[grep("^--file=", options)], 8)) #As done in fit-hmm.R
 
-MSG_packages <- c("R.methodsS3", "R.oo", "zoo", "HiddenMarkov")
+MSG_packages <- c("R.methodsS3", "R.oo", "HiddenMarkov")
 
 check_package <- function(pkg_name, MSG_directory) {
    if (!require(pkg_name, lib.loc=MSG_directory, character.only=TRUE)) {
