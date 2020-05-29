@@ -25,22 +25,34 @@ http://www.ncbi.nlm.nih.gov/pubmed/21233398
 ### Known good dependencies from older Janelia versions of MSG
 
 Python (2.6.4)
+
 numpy (recent versions should be fine)
+
 bwa (0.5.7)
+
 samtools (0.1.9-3)  ! Newer versions of Samtools will not work !
+
 biopython-1.53
+
 Pyrex-0.9.9
+
 pysam-0.1.2 (apply fix as described here: http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0)
+
 R packages (HiddenMarkov 1.3-1, zoo 1.6-2, R.methodsS3 1.2.0 and R.oo 1.7.3)
+
 Perl Modules (IO::Uncompress::Gunzip)
-    -- A command like this should work on Unix Desktop Systems:
-    -- perl -MCPAN -e 'install IO::Uncompress::Gunzip'
+
+ * A command like this should work on Unix Desktop Systems: `perl -MCPAN -e 'install IO::Uncompress::Gunzip'`
+
 mailer (Python package: http://pypi.python.org/pypi/mailer) - optional; for sending email alert when run completes
 
 ### Installation instructions ###
 ```bash
 git clone git://github.com/JaneliaSciComp/msg.git
 cd msg
+#If you want the latest features and fixes, use the dev branch:
+git checkout dev
+#Install the packaged samtools, and all necessary R packages:
 make
 ```
 
@@ -49,11 +61,16 @@ When you run `make`, note the installation path for the samtools executable that
 The Makefile will attempt to install the necessary R packages, and will check for other major dependencies (Perl, Python, R, BWA, SAMtools, BioPython, Pysam)
 
 ## Toy Example
+
 The toy example is useful to check that MSG and dependencies are installed and functioning correctly.
+
 **Instructions incomplete, pending update**
 
 ## Example with Real Data
+
 **Instructions incomplete, pending update**
+
 Download the data from NCBI's Sequence Read Archive and MSG config and barcodes file
- - example/get_sample_data.sh (requires wget)
+
+ * example/get_sample_data.sh (requires wget)
 
