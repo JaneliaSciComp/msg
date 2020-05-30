@@ -4,13 +4,10 @@ FROM ubuntu:16.04
 
 ################## METADATA ######################
 LABEL base.image="ubuntu:16.04"
-LABEL software="Biocontainers base Image"
-LABEL software.version="08252016"
-LABEL about.summary="Base image for BioDocker"
-LABEL about.home="http://biocontainers.pro"
-LABEL about.documentation="https://github.com/BioContainers/specs/wiki"
-LABEL license="https://github.com/BioContainers/containers/blob/master/LICENSE"
-LABEL about.tags="Genomics,Proteomics,Transcriptomics,General,Metabolomics"
+LABEL software="msg"
+LABEL about.home="https://github.com/YourePrettyGood/msg"
+LABEL about.documentation="https://github.com/YourePrettyGood/msg"
+LABEL license="https://github.com/YourePrettyGood/msg/blob/master/LICENSE"
 ################## MAINTAINER ######################
 
 MAINTAINER Yuan(Alvin) Chen <ychenbioinfo@gmail.com>
