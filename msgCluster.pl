@@ -2,7 +2,7 @@
 use warnings;
 use strict;
 use File::Basename;
-use lib qw(./msg .);
+use lib qw(/msg .);
 use Utils;
 
 sub trim { #Derived from Princeton CSES code

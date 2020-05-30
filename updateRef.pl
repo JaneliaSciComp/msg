@@ -8,7 +8,8 @@ use warnings;
 use Getopt::Std;
 use File::Basename;
 
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 my $src = dirname $0 ;
