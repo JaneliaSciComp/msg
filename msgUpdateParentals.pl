@@ -6,6 +6,8 @@ use FindBin;
 use lib $FindBin::Bin;
 use Utils;
 
+my $src = dirname $0;
+
 print "\nMSG - Update Parentals\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
 printf "%4d-%02d-%02d %02d:%02d:%02d\n\n", $year+1900,$mon+1,$mday,$hour,$min,$sec;
@@ -75,7 +77,7 @@ if (exists $params{'parent1_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
     open (OUT,'>msgRunU0-1.sh');
     print OUT "/bin/hostname\n/bin/date\n",
-    'perl msg/msg.pl ',
+    "perl $src/msg.pl ",
     ' --update ',
     ' --parent1 ', $params{'parent1'}, 
     ' --update_minQV ', $params{'update_minQV'},
@@ -120,7 +122,7 @@ if (exists $params{'parent2_reads'}) {
     $params{'update_minQV'} = 1 unless (exists $params{'update_minQV'});
     open (OUT,'>msgRunU0-2.sh');
     print OUT "/bin/hostname\n/bin/date\n",
-    'perl msg/msg.pl ',
+    "perl $src/msg.pl ",
     ' --update ',
     ' --parent2 ', $params{'parent2'},
     ' --update_minQV ', $params{'update_minQV'},
