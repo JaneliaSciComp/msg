@@ -2,7 +2,8 @@
 use File::Basename;
 use File::Copy;
 use Getopt::Long;
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 my $true = 1;

@@ -2,7 +2,8 @@
 use warnings;
 use strict;
 use File::Basename;
-use lib qw(/msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 sub trim { #Derived from Princeton CSES code
