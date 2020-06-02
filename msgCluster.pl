@@ -395,7 +395,7 @@ if ($params{'cluster'} != 0) {
        &Utils::system_call("python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv > logs.$$/hmmprob_to_est.$$.stdout 2> logs.$$/hmmprob_to_est.$$.stderr");
    }
    if ($params{'full_summary_plots'} == 1) {
-        &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
+        &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
    }
    else {
         &Utils::system_call("python msg/combine.py -d hmm_fit > logs.$$/combine.$$.stdout 2> logs.$$/combine.$$.stderr");
