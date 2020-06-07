@@ -4,7 +4,8 @@ use strict;
 use POSIX qw(ceil);
 use File::Basename;
 use File::Copy;
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 my $version = 1.0;

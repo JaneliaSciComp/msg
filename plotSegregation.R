@@ -1,7 +1,10 @@
 #!/usr/bin/env Rscript
 
-source(sprintf("%s/ded.R", "msg"))
-source(sprintf("%s/hmmlib.R", "msg"))
+args <- commandArgs()
+dollar0 <- substring(args[grep("^--file=", args)], 8)
+
+source(sprintf("%s/ded.R", dirname(dollar0)))
+source(sprintf("%s/hmmlib.R", dirname(dollar0)))
 
 ## If you are running this code interactively (i.e. separately from a
 ## run of the MSG software) then don't evalue the following line.

@@ -6,7 +6,8 @@
 # For gzipped output instead; we don't need it right now
 #use IO::Compress::Gzip qw(gzip $GzipError);
 
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 use Getopt::Std;

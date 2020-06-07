@@ -2,15 +2,18 @@
 use File::Basename;
 use File::Copy;
 use Getopt::Long;
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 my $true = 1;
 my $false = 0;
-#Read in version from version file
-my $version = do { local( @ARGV, $/ ) = './msg/version'; <> };
 
 my $src = dirname $0;
+
+#Read in version from version file
+my $version = do { local( @ARGV, $/ ) = "$src/version"; <> };
+
 my $update_genomes = $false;
 my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $parent2_genome, $parent1_reads, $parent2_reads, $update_minQV, $min_coverage, $max_coverage_stds, $max_coverage_exceeded_state,
     $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa,
