@@ -2,7 +2,8 @@
 use warnings;
 use strict;
 use File::Basename;
-use lib qw(./msg .);
+use FindBin;
+use lib $FindBin::Bin;
 use Utils;
 
 sub trim { #Derived from Princeton CSES code
@@ -10,6 +11,9 @@ sub trim { #Derived from Princeton CSES code
     ($s) = $s =~ /^[a-zA-Z ]*<?(\d+[\w[\].-]*)>?/;
     return $s;
 }
+
+# get msg folder
+my $src = dirname $0;
 
 print "\nMSG\n";
 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
@@ -142,16 +146,16 @@ my @chroms;
 
 my $numcontigs = scalar(@chroms);
 
-open (OUT,'>msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLengths: $!\n";
+open (OUT, '>', 'msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLengths: $!\n";
 print OUT "chr,length\n";
 foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; } 
 close OUT;
 
 ####################################################################################################
 ### Parsing
-open (OUT,">msgRun1.$$.sh");
+open (OUT, ">", "msgRun1.$$.sh");
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
-    'perl msg/msg.pl ',
+    "perl $src/msg.pl ",
     ' --barcodes ', $params{'barcodes'},
     ' --re_cutter ', $params{'re_cutter'},
     ' --linker_system ', $params{'linker_system'},
@@ -189,7 +193,7 @@ close OUT;
 ### barcoded individuals from parsing step
 if ($params{'index_file'} && $params{'index_barcodes'}) {
     &Utils::system_call(
-        "python msg/barcode_splitter.py --make_indexed_msg_barcodes_file --msg_barcodes " . $params{'barcodes'} .
+        "python $src/barcode_splitter.py --make_indexed_msg_barcodes_file --msg_barcodes " . $params{'barcodes'} .
         " --bcfile " . $params{'index_barcodes'} . " > logs.$$/barcode_splitter.$$.stdout 2> logs.$$/barcode_splitter.$$.stderr");
     $params{'barcodes'} = $params{'barcodes'} . '.after.index.parsing';
 }
@@ -197,7 +201,7 @@ if ($params{'index_file'} && $params{'index_barcodes'}) {
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file
 my $num_barcodes = 0;
-open(FILE,$params{'barcodes'}) || die "ERROR (msgCluster): Can't open $params{'barcodes'}: $!\n";
+open(FILE, "<", $params{'barcodes'}) || die "ERROR (msgCluster): Can't open $params{'barcodes'}: $!\n";
 while (<FILE>) { chomp $_;
 	     if ($_ =~ /^\S+\t.*$/) {
             $num_barcodes ++;
@@ -208,7 +212,7 @@ print "num barcodes is $num_barcodes!\n";
 
 # Note we include some parsing parameters here since the new style parser operates
 # at the begining of msgRun2.
-open (OUT,">msgRun2.$$.sh");
+open (OUT,">", "msgRun2.$$.sh");
 
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
 if ($params{'cluster'}) {
@@ -217,10 +221,10 @@ if ($params{'cluster'}) {
         "end=\"\$((\$max_arrayid<$num_barcodes?\$max_arrayid:$num_barcodes))\"\n",
         "for ((h=\$start; h<=\$end; h++)); do\n",
         "   sed -n \"\${h} p\" $params{'barcodes'} > $params{'barcodes'}.$$.\$h\n", #Prevent multi-run collision of barcode files
-        '   perl msg/msg.pl ',
+        "   perl $src/msg.pl ",
         " --barcodes $params{'barcodes'}.$$.\$h"; #Prevent multi-run collision of barcode files
 } else {
-   print OUT "perl msg/msg.pl --barcodes $params{'barcodes'}";
+   print OUT "perl $src/msg.pl --barcodes $params{'barcodes'}";
 }
    print OUT ' --reads ', $params{'reads'},
    ' --parent1 ', $params{'parent1'},
@@ -315,7 +319,7 @@ if (!$params{'msgRunOther'}) {
 
 if ($params{'cluster'} != 0) {
    $jobname = "msgRun2a.$$";
-   &Utils::wrap_cmdline("$jobname.sh", "python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
+   &Utils::wrap_cmdline("$jobname.sh", "python $src/create_stats.py -i $params{'reads'} -b $params{'barcodes'}");
    $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
@@ -323,7 +327,7 @@ if ($params{'cluster'} != 0) {
    }
    if ($params{'pepthresh'} ne '') {
       $jobname = "msgRun2b.$$";
-      &Utils::wrap_cmdline("$jobname.sh", "python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_est.csv");
+      &Utils::wrap_cmdline("$jobname.sh", "python $src/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_est.csv");
       $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} ./${jobname}.sh}");
       $jobid = trim($jobid);
       if ($params{'verbose'}) {
@@ -332,10 +336,10 @@ if ($params{'cluster'} != 0) {
    }
    $jobname = "msgRun3.$$";
    if ($params{'full_summary_plots'} == 1) {
-      &Utils::wrap_cmdline("$jobname.sh", "Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'}");
+      &Utils::wrap_cmdline("$jobname.sh", "Rscript $src/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'}");
    }
    else {
-      &Utils::wrap_cmdline("$jobname.sh", "python msg/combine.py -d hmm_fit");
+      &Utils::wrap_cmdline("$jobname.sh", "python $src/combine.py -d hmm_fit");
    }
    $jobid = $params{'msgRun2'} ? &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} $params{'array_job_depend_arg'} ./${jobname}.sh}") : &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'msgrun3_submit_options'} ./${jobname}.sh}");
    $jobid = trim($jobid);
@@ -346,7 +350,7 @@ if ($params{'cluster'} != 0) {
    $prev_jobid = $jobid;
    
    $jobname = "msgRun4.$$";
-   &Utils::wrap_cmdline("$jobname.sh", "perl msg/summary_mismatch.pl $params{'barcodes'} 0");
+   &Utils::wrap_cmdline("$jobname.sh", "perl $src/summary_mismatch.pl $params{'barcodes'} 0");
    $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
@@ -356,7 +360,7 @@ if ($params{'cluster'} != 0) {
    $prev_jobid = $jobid;
    #Run a simple validation
    $jobname = "msgRun5.$$";
-   &Utils::wrap_cmdline("$jobname.sh", "python msg/validate.py $params{'barcodes'}");
+   &Utils::wrap_cmdline("$jobname.sh", "python $src/validate.py $params{'barcodes'}");
    $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}");
    $jobid = trim($jobid);
    if ($params{'verbose'}) {
@@ -377,7 +381,7 @@ if ($params{'cluster'} != 0) {
    #Notify users that MSG run has completed
    if ($params{'email_host'} && $params{'notify_emails'}) {
       $jobname = "msgRun7.$$";
-      &Utils::wrap_cmdline("$jobname.sh", "python msg/send_email.py -e $params{'email_host'} -t $params{'notify_emails'} -s \"MSG Run $$ has completed\" -b \"NOTE: Output and error messages are located in msgOut.$$, msgError.$$, and logs.$$\"");
+      &Utils::wrap_cmdline("$jobname.sh", "python $src/send_email.py -e $params{'email_host'} -t $params{'notify_emails'} -s \"MSG Run $$ has completed\" -b \"NOTE: Output and error messages are located in msgOut.$$, msgError.$$, and logs.$$\"");
       $jobid = &Utils::system_call(eval "qq{$params{'submit_cmd'} $params{'default_submit_options'} $params{'depend_arg'} ./${jobname}.sh}"); #Not sure why depend_arg is used here instead of array_job_depend_arg
       $jobid = trim($jobid);
       if ($params{'verbose'}) {
@@ -390,24 +394,24 @@ if ($params{'cluster'} != 0) {
    }
 } else { 
    &Utils::system_call("./msgRun2.$$.sh > logs.$$/msgRun2.$$.stdout 2> logs.$$/msgRun2.$$.stderr");
-   &Utils::system_call("python msg/create_stats.py -i $params{'reads'} -b $params{'barcodes'} > logs.$$/create_stats.$$.stdout 2> logs.$$/create_stats.$$.stderr");
+   &Utils::system_call("python $src/create_stats.py -i $params{'reads'} -b $params{'barcodes'} > logs.$$/create_stats.$$.stdout 2> logs.$$/create_stats.$$.stderr");
    if ($params{'pepthresh'} ne '') {
-       &Utils::system_call("python msg/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv > logs.$$/hmmprob_to_est.$$.stdout 2> logs.$$/hmmprob_to_est.$$.stderr");
+       &Utils::system_call("python $src/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv > logs.$$/hmmprob_to_est.$$.stdout 2> logs.$$/hmmprob_to_est.$$.stderr");
    }
    if ($params{'full_summary_plots'} == 1) {
-        &Utils::system_call("Rscript msg/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
+        &Utils::system_call("Rscript $src/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
    }
    else {
-        &Utils::system_call("python msg/combine.py -d hmm_fit > logs.$$/combine.$$.stdout 2> logs.$$/combine.$$.stderr");
+        &Utils::system_call("python $src/combine.py -d hmm_fit > logs.$$/combine.$$.stdout 2> logs.$$/combine.$$.stderr");
    }
-   &Utils::system_call("perl msg/summary_mismatch.pl $params{'barcodes'} 0 > logs.$$/summary_mismatch.$$.stdout 2> logs.$$/summary_mismatch.$$.stderr");
+   &Utils::system_call("perl $src/summary_mismatch.pl $params{'barcodes'} 0 > logs.$$/summary_mismatch.$$.stdout 2> logs.$$/summary_mismatch.$$.stderr");
    #Run a simple validation
-   &Utils::system_call("python msg/validate.py $params{'barcodes'} $params{'full_summary_plots'} > logs.$$/validate.$$.stdout 2> logs.$$/validate.$$.stderr");
+   &Utils::system_call("python $src/validate.py $params{'barcodes'} $params{'full_summary_plots'} > logs.$$/validate.$$.stdout 2> logs.$$/validate.$$.stderr");
    #Cleanup - move output files to folders, remove barcode related files
    &Utils::system_call("mv -f msgRun*.${$}.e** msgError.$$; mv -f msgRun*.${$}.pe** msgError.$$; mv -f msgRun*.${$}.o* msgOut.$$; mv -f msgRun*.${$}.po* msgOut.$$; mv -f *.trim.log msgOut.$$; rm -f temp.fq; rm -f $params{'barcodes'}.*");
    #Notify users that MSG run has completed
    if ($params{'email_host'} && $params{'notify_emails'}) {
-     &Utils::system_call("python msg/send_email.py -e $params{'email_host'}" .
+     &Utils::system_call("python $src/send_email.py -e $params{'email_host'}" .
         " -t $params{'notify_emails'} -s 'MSG Run has completed'" .
         " -b 'NOTE: Output and error messages are located in msgOut.$$, msgError.$$, and logs.$$ folders.'"
         );
