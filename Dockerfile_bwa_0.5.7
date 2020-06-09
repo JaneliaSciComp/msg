@@ -14,8 +14,18 @@ MAINTAINER Yuan(Alvin) Chen <ychenbioinfo@gmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
 
+#    bash -c 'echo -e "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse\n\
+#deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-updates main restricted universe multiverse\n\
+#deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-backports main restricted universe multiverse\n\
+#deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-security main restricted universe multiverse\n\n" > /etc/apt/sources.list' && \
+#deb http://mirrors.us.kernel.org/ubuntu trusty main universe\n\
+#deb http://mirrors.us.kernel.org/ubuntu trusty-updates main universe\n\
 RUN mv /etc/apt/sources.list /etc/apt/sources.list.bkp && \
     bash -c 'echo -e "deb mirror://mirrors.ubuntu.com/mirrors.txt bionic main restricted universe multiverse\n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse\n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-updates main restricted universe multiverse\n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-backports main restricted universe multiverse\n\
+deb mirror://mirrors.ubuntu.com/mirrors.txt xenial-security main restricted universe multiverse\n\
 deb mirror://mirrors.ubuntu.com/mirrors.txt bionic-updates main restricted universe multiverse\n\
 deb mirror://mirrors.ubuntu.com/mirrors.txt bionic-backports main restricted universe multiverse\n\
 deb mirror://mirrors.ubuntu.com/mirrors.txt bionic-security main restricted universe multiverse\n\n" > /etc/apt/sources.list' && \
@@ -90,18 +100,34 @@ RUN conda config --add channels conda-forge
 
 RUN conda upgrade conda
 
-#Use R 3.5.1 because latest R is 4.0.0 and doesn't have updated packages
+# install bwa - failed to compile 0.5.7 provided in the dependencies, use 0.5.9 from conda 
+# Use R 3.5.1 because latest R is 4.0.0 and doesn't have updated packages
 #Use bwa 0.7.17-0:
-RUN conda install bwa=0.7.17-0 r=3.5.1 r-r.oo r-r.methodss3 r-hiddenmarkov
+#RUN conda install bwa=0.7.17-0 r=3.5.1 r-r.oo r-r.methodss3 r-hiddenmarkov
+
+#To test using bwa 0.5.7 from the dependencies folder, use this:
+RUN conda install r=3.5.1 r-r.oo r-r.methodss3 r-hiddenmarkov
+COPY ./dependencies/bwa-0.5.7.tar.bz2 /usr/opt
 
 COPY ./ /msg
 COPY ./cmdline /msg/cmdline
+#COPY ./dependencies/zlib-1.2.5.tar.bz2 /usr/opt
 COPY ./dependencies/samtools-0.1.9.tar.bz2 /usr/opt
 #An older Stampy (1.0.23) is packaged with older commits as Stampy-latest.tgz
+#COPY ./dependencies/stampy-latest.tgz /usr/opt
 # but I'll test with the newest Stampy (1.0.32) for now:
 COPY ./dependencies/stampy-1.0.32.tgz /usr/opt
+#COPY ./dependencies/Pyrex-0.9.9.tar.gz /usr/opt
 
 WORKDIR /usr/opt
+
+#No need for old zlib
+# install libz
+#RUN tar -jvxf zlib-1.2.5.tar.bz2 && \
+#    cd zlib-1.2.5 && \
+#    ./configure && \
+#    make && \
+#    make install
 
 #Might not need this if we can get the MSG makefile working with Docker:
 # install samtools
@@ -120,6 +146,12 @@ RUN tar -zvxf stampy-1.0.32.tgz && \
 
 ENV PATH /usr/opt/stampy-1.0.32:$PATH
 
+#Installing Pyrex via apt-get above instead
+# install Pyrex
+#RUN tar -zvxf Pyrex-0.9.9.tar.gz && \
+#    cd Pyrex-0.9.9 && \
+#    python setup.py install
+
 WORKDIR /msg
 
 RUN gcc -O2 -lm -o countalleles countalleles.c && \
@@ -131,5 +163,20 @@ RUN sh test_dependencies_R.sh
 # recapitulating parts of it with RUN statements:
 #RUN make
 #ENV PATH /msg/samtools-0.1.9:$PATH
+
+#Install BWA 0.5.7:
+WORKDIR /usr/opt
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y gcc-4.7 && \
+    ln -sf /usr/bin/gcc-4.7 /usr/bin/gcc
+RUN gcc --version && \
+    tar -jvxf bwa-0.5.7.tar.bz2 && \
+    cd bwa-0.5.7 && \
+    make
+
+ENV PATH /usr/opt/bwa-0.5.7:$PATH
+
+
 
 WORKDIR /data

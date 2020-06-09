@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # updateRef.pl
 # Example call:
 # perl updateRef.pl dsim-all-chromosome-r1.3.fasta.msg update_reads-aligned-parent1.pileup 0 1 2 5 N
@@ -21,6 +21,7 @@ $min_coverage = 2 unless (defined $min_coverage);
 $max_coverage_exceeded_state = "N" unless (defined $max_coverage_exceeded_state);
 #default for max_coverage_stds is undef, which means there is no max.
 
+#Note: Hash key order is random, so output FASTA isn't in the same order as input
 my %refReads = &Utils::readFasta($refFile,0);
 my $outfile  = "$refFile.updated";
 print "UPDATE REFERENCE FILE: $outfile\n";
@@ -57,11 +58,15 @@ foreach my $contig (keys %refReads) {
 		$genome_total += length($refReads{$contig});
 		$genome_uncovered += length($refReads{$contig});
 		
-		open(OUT,">>$outfile.fastq") || die "ERROR: Can't write to $outfile.fastq: $!\n";
+		open(OUT, ">>", "$outfile.fastq") || die "ERROR: Can't write to $outfile.fastq: $!\n";
 		my $printout;
-		my $fake_qual ='!' x length($refReads{$contig});
-		print OUT "\@$contig\n"; $printout = &p2q_print_str($contig,'seq',\$refReads{$contig}); print OUT "$printout\n";
-		print OUT "+$contig\n"; $printout = &p2q_print_str($contig,'qual',\$fake_qual); print OUT "$printout\n";
+		my $fake_qual = '!' x length($refReads{$contig});
+		print OUT "\@$contig\n";
+		$printout = &p2q_print_str($contig, 'seq', \$refReads{$contig});
+		print OUT "$printout\n";
+		print OUT "+$contig\n";
+		$printout = &p2q_print_str($contig, 'qual', \$fake_qual);
+		print OUT "$printout\n";
 		close OUT;
 	}
 }

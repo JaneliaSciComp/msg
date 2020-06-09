@@ -15,6 +15,7 @@ opts <- getopts()
 ## result of this line:
 cat("Input parameters for summaryPlots.R\nopts <-") ; dput(opts)
 
+stopifnot(length("l" %in% names(opts)) > 0)
 plot.correlation.matrix <- opts$l > 0
 write.ancestry.probs <- TRUE
 breakpoint.widths <- FALSE

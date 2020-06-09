@@ -11,11 +11,13 @@ http://www.ncbi.nlm.nih.gov/pubmed/21233398
 1. BioPython
 1. Pysam (should work with any modern version)
 1. Perl (any modern version, so typically 5.10+, which will include IO::Uncompress::Gunzip in the base modules)
-1. BWA (should work with modern versions, tested with 0.5.7 and 0.7.12-r1044)
+1. Switch (a Perl module, available as libswitch-perl on Ubuntu)
+1. BWA (should work with modern versions, tested with 0.5.7, 0.7.12-r1044, and 0.7.17)
 1. SAMtools (**0.1.9-3 is REQUIRED, newer versions do not work**)
-1. R (should work with modern versions, tested with 3.2.3 and 3.4.1)
+1. R (should work with modern versions, tested with 3.2.3, 3.4.1, and 3.5.1, but not 4)
 1. R.methodsS3
 1. R.oo
+1. HiddenMarkov (an R package)
 1. A C compiler (GCC and clang preferred, nothing special required)
 
 ### Optional dependencies
@@ -46,7 +48,7 @@ Perl Modules (IO::Uncompress::Gunzip)
 
 mailer (Python package: http://pypi.python.org/pypi/mailer) - optional; for sending email alert when run completes
 
-### Installation instructions ###
+### Installation instructions
 ```bash
 git clone git://github.com/JaneliaSciComp/msg.git
 cd msg
@@ -59,6 +61,24 @@ make
 When you run `make`, note the installation path for the samtools executable that is printed in the output.  You'll need to set `samtools_path` in your msg.cfg to this path.
 
 The Makefile will attempt to install the necessary R packages, and will check for other major dependencies (Perl, Python, R, BWA, SAMtools, BioPython, Pysam)
+
+### Docker-based installation (non-cluster usage)
+
+Thanks to @ychenbioinfo for doing the heavy lifting getting a Dockerfile set up for MSG!
+
+```bash
+docker pull youreprettygood/msg
+docker run -i -t --name [Name for MSG container instance] -v [Absolute path to MSG working directory]:/data:Z youreprettygood/msg:latest /bin/bash
+#If you need to use reads to update your parental genomes,
+# you can use MSG to do so (although better methods exist)
+# by calling:
+msgUpdateParentals.pl
+#When you have your working directory all set (including parental references),
+# run MSG:
+msgCluster.pl
+#Note that the current Dockerfile does not support cluster job submission,
+# so you MUST have cluster=0 in update.cfg and msg.cfg
+```
 
 ## Toy Example
 
@@ -74,3 +94,8 @@ Download the data from NCBI's Sequence Read Archive and MSG config and barcodes 
 
  * example/get_sample_data.sh (requires wget)
 
+## Potential future example datasets
+
+1. [Cande et al. (2012) PLoS One](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0043888)
+
+2. [Liu et al. (2019) Current Biology](https://www.sciencedirect.com/science/article/abs/pii/S0960982219306888)

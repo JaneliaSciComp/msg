@@ -146,14 +146,14 @@ my @chroms;
 
 my $numcontigs = scalar(@chroms);
 
-open (OUT,'>msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLengths: $!\n";
+open (OUT, '>', 'msg.chrLengths') || die "ERROR (msgCluster): Can't create msg.chrLengths: $!\n";
 print OUT "chr,length\n";
 foreach my $chr (sort @chroms) { print OUT "$chr,$par1_reads{$chr}\n"; } 
 close OUT;
 
 ####################################################################################################
 ### Parsing
-open (OUT,">msgRun1.$$.sh");
+open (OUT, ">", "msgRun1.$$.sh");
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n",
     "perl $src/msg.pl ",
     ' --barcodes ', $params{'barcodes'},
@@ -201,7 +201,7 @@ if ($params{'index_file'} && $params{'index_barcodes'}) {
 ### Mapping & Plotting
 ### qsub array: one for each line in the barcode file
 my $num_barcodes = 0;
-open(FILE,$params{'barcodes'}) || die "ERROR (msgCluster): Can't open $params{'barcodes'}: $!\n";
+open(FILE, "<", $params{'barcodes'}) || die "ERROR (msgCluster): Can't open $params{'barcodes'}: $!\n";
 while (<FILE>) { chomp $_;
 	     if ($_ =~ /^\S+\t.*$/) {
             $num_barcodes ++;
@@ -212,7 +212,7 @@ print "num barcodes is $num_barcodes!\n";
 
 # Note we include some parsing parameters here since the new style parser operates
 # at the begining of msgRun2.
-open (OUT,">msgRun2.$$.sh");
+open (OUT,">", "msgRun2.$$.sh");
 
 print OUT "#!/bin/bash\n/bin/hostname\n/bin/date\n";
 if ($params{'cluster'}) {
@@ -399,7 +399,7 @@ if ($params{'cluster'} != 0) {
        &Utils::system_call("python $src/hmmprob_to_est.py -d hmm_fit -t $params{'pepthresh'} -o hmm_fits_ests.csv > logs.$$/hmmprob_to_est.$$.stdout 2> logs.$$/hmmprob_to_est.$$.stderr");
    }
    if ($params{'full_summary_plots'} == 1) {
-        &Utils::system_call("Rscript $src/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
+        &Utils::system_call("Rscript $src/summaryPlots.R -c $params{'chroms'} -p $params{'chroms2plot'} -d hmm_fit -t $params{'thinfac'} -f $params{'difffac'} -b $params{'barcodes'} -n $params{'pnathresh'} -l $params{'plot_lod_matrix'} > logs.$$/msgRun3.$$.stdout 2> logs.$$/msgRun3.$$.stderr");
    }
    else {
         &Utils::system_call("python $src/combine.py -d hmm_fit > logs.$$/combine.$$.stdout 2> logs.$$/combine.$$.stderr");
