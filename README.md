@@ -68,7 +68,7 @@ Thanks to @ychenbioinfo for doing the heavy lifting getting a Dockerfile set up 
 
 ```bash
 docker pull youreprettygood/msg
-docker run -i -t --name [Name for MSG container instance] -v [Absolute path to MSG working directory]:/data:Z youreprettygood/msg:latest /bin/bash
+docker run -i -t --name [Name for MSG container instance] -v [Absolute path to MSG working directory]:/data:Z youreprettygood/msg:0.5 /bin/bash
 #If you need to use reads to update your parental genomes,
 # you can use MSG to do so (although better methods exist)
 # by calling:
@@ -83,6 +83,12 @@ msgCluster.pl
 ## Toy Example
 
 The toy example is useful to check that MSG and dependencies are installed and functioning correctly.
+
+To test your installation, run MSG (according to the instructions above, e.g. the Docker instructions) in the `example_MSG_toy` directory, and then compare the `ancestry-prob-par*.tsv` files to those found in `example_results` under the appropriate version of BWA.
+
+Be sure to adjust `update.cfg` and `msg.cfg` if you wish to test a cluster installation. It's best to run `msgUpdateParentals.pl` on a single node (i.e. `cluster=0`), but you can change `msg.cfg` to use `cluster=1` as long as you adjust other cluster job submission options appropriately.
+
+The toy example requires that you run `msgUpdateParentals.pl` before you run `msgCluster.pl`.
 
 **Instructions incomplete, pending update**
 
