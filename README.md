@@ -90,7 +90,19 @@ Be sure to adjust `update.cfg` and `msg.cfg` if you wish to test a cluster insta
 
 The toy example requires that you run `msgUpdateParentals.pl` before you run `msgCluster.pl`.
 
-**Instructions incomplete, pending update**
+Once `msgUpdateParentals.pl` and `msgCluster.pl` have successfully completed, there are a few different primary output files to check: `ancestry-prob-par*.tsv` (the full matrices of posterior probabilities of ancestry assignments), the per-individual HMM plots `hmm_fit/indiv*/indiv*-hmmprob.pdf` (showing the posterior probability of each ancestry along each scaffold), and the diagnostic plots in `hmm_fit_images/`.
+
+The primary test for a successful installation is that there are no differences between the `ancestry-prob-par*.tsv` files from your run and the versions found in `example_results` under your version of BWA. We provide a simple script `diff_posteriors.awk` to identify any differences between the corresponding files. You can check this with:
+
+```bash
+[path to MSG install]/diff_posteriors.awk ancestry-prob-par1.tsv example_results/bwa_[version]/ancestry-prob-par1.tsv
+[path to MSG install]/diff_posteriors.awk ancestry-prob-par1par2.tsv example_results/bwa_[version]/ancestry-prob-par1par2.tsv
+[path to MSG install]/diff_posteriors.awk ancestry-prob-par2.tsv example_results/bwa_[version]/ancestry-prob-par2.tsv
+```
+
+Thus, a successful installation and test will have zero output from each of these three commands.
+
+You can visually inspect the per-individual HMM plots and diagnostic plots if you want, though identical `ancestry-prob-par*.tsv` files should imply identical per-individual HMM plots.
 
 ## Example with Real Data
 
