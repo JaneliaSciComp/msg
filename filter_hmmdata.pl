@@ -81,10 +81,10 @@ open OUT, ">", $output_path;
 print OUT "pos\tref\tcons\treads\tquals\tA\tC\tG\tT\tN\tbad\tpar1ref\tpar2ref\n";
 
 #Iterate over the sites in the input .hmmdata file:
-while (my $line=<IN>){
+while (my $line=<IN>) {
    chomp $line;
 
-   my @elements = split(/\t/,$line);
+   my @elements = split(/\t/, $line);
    $position = $elements[0];
    my $par1 = $elements[11];
    my $par2 = $elements[12];
@@ -92,11 +92,11 @@ while (my $line=<IN>){
    #For non-N sites that differ between the parents (AIMs):
    if ($par1 ne $par2 and $par1 ne 'N' and $par2 ne 'N') {
       $site_current = $position;
-	   #print "$position\n";
-	   my $distance = $site_current - $last_site;
+      #print "$position\n";
+      my $distance = $site_current - $last_site; #Off-by-one/fencepost?
 
       #If the AIMs are farther than a read's length apart, keep the site:
-	   if ($distance > $read_length){
+      if ($distance > $read_length){
          print OUT "$line\n";
       }
       $last_site = $site_current;
@@ -106,5 +106,5 @@ close IN;
 close OUT;
 
 if ($overwrite == 1){
-    system("mv $output_path $input_path");
+   system("mv -f $output_path $input_path");
 }
