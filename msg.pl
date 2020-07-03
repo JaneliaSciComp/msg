@@ -4,24 +4,23 @@ use File::Copy;
 use Getopt::Long;
 use FindBin;
 use lib $FindBin::Bin;
-use Utils;
-
-my $true = 1;
-my $false = 0;
+use Utils; #POSIX is included via Utils.pm
 
 my $src = dirname $0;
 
 #Read in version from version file
 my $version = do { local( @ARGV, $/ ) = "$src/version"; <> };
 
-my $update_genomes = $false;
+my $update_genomes = 0;
 my ($barcodes, $re_cutter, $linker_system, $raw_read_data, $parent1_genome, $parent2_genome, $parent1_reads, $parent2_reads, $update_minQV, $min_coverage, $max_coverage_stds, $max_coverage_exceeded_state,
     $parse_or_map, $priors, $chroms, $sexchroms, $chroms2plot, $deltapar1, $deltapar2, $recRate, $rfac, $bwaindex1, $bwaindex2, $theta, $bwa_alg, $bwa_threads, $use_stampy, $stampy_premap_w_bwa,
     $stampy_pseudo_threads, $cluster, $addl_qsub_option_for_pe, $quality_trim_reads_thresh, $quality_trim_reads_consec, $indiv_stampy_substitution_rate, $parent_stampy_substitution_rate,
     $indiv_mapq_filter, $parent_mapq_filter, $index_file, $index_barcodes, $debug, $gff_thresh_conf, $new_parser, $new_parser_offset, $new_parser_filter_out_seq, $custom_qsub_options_for_all_cmds,
-    $one_site_per_contig, $pepthresh, $logdir, $filter_hmmdata, $read_length, $repeat_threshold, $samtools_path);
+    $one_site_per_contig, $pepthresh, $logdir, $filter_hmmdata, $read_length, $repeat_threshold, $samtools_path, $n_parallel);
     
 my $max_mapped_reads = 0; #Use 0 as default, which skips truncation of SAMs
+
+$n_parallel = 1; #Default to serial processing of samples
 
 GetOptions(
     'barcodes|b=s' => \$barcodes,
@@ -44,7 +43,7 @@ GetOptions(
     'chroms2plot=s' => \$chroms2plot,
     'deltapar1=s' => \$deltapar1,
     'deltapar2=s' => \$deltapar2,
-	'recRate=s' => \$recRate,    
+    'recRate=s' => \$recRate,    
     'rfac=s' => \$rfac,
     'bwaindex1=s' => \$bwaindex1,
     'bwaindex2=s' => \$bwaindex2,
@@ -77,14 +76,15 @@ GetOptions(
     'filter_hmmdata=i' => \$filter_hmmdata,
     'read_length=i' => \$read_length,
     'repeat_threshold=i' => \$repeat_threshold,
-    'samtools_path=s' => \$samtools_path
+    'samtools_path=s' => \$samtools_path,
+    'n_parallel=i' => \$n_parallel
     );
 
 #### INTERNAL OPTIONS (for developers) #####
 
 # Should MD tags be added to mapped SAM files when they are not included by default.
 # It's slower to add them but they seem to affect the output.
-my $GEN_MD_TAGS = $true;
+my $GEN_MD_TAGS = 1;
 
 ############################################
 
@@ -131,6 +131,7 @@ print "filter_hmmdata $filter_hmmdata\n\n";
 print "read_length $read_length\n\n";
 print "repeat_threshold $repeat_threshold\n\n";
 print "samtools_path $samtools_path\n\n";
+print "n_parallel $n_parallel\n\n";
 
 if( $update_genomes ) {
 	print "update genomes params:\n";
@@ -284,84 +285,79 @@ if( $update_genomes ) {
     
             unless (-e "$out.sam") {
                 if ($use_stampy == 1) {
-                    #Build stampy genome file
-                    &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg", "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
-                    #Build stampy hash file
-                    &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
-                    #Call stampy mapping with or without bwa
-                    my $bwa_options = "";
-                    if ($stampy_premap_w_bwa == 1) {
-                        $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg\"";
-                    }
-                    if (($stampy_pseudo_threads > 0) && ($cluster == 1)) {
-                        run_stampy_on_cluster($sp, $bwa_options, $out, $stampy_pseudo_threads, $reads_for_updating_fq{$sp}, $parent_stampy_substitution_rate);
-                    }
-                    else {
-                        #Standard Stampy run w/o qsub
-                        &Utils::system_call("stampy.py", $bwa_options, 
-                            "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", 
-                            "--substitutionrate", $parent_stampy_substitution_rate,
-                            "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam", "> $logdir/stampyRun${sp}.msg$$.stdout 2> $logdir/stampyRun${sp}.msg$$.stderr");
-                    }                    
-                }
-                elsif ($bwa_alg eq 'aln') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai", "2> $logdir/bwaAln${sp}.msg$$.stderr");
-                    &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSamse${sp}.msg$$.stderr");
-                }
-                elsif ($bwa_alg eq 'bwasw') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSW${sp}.msg$$.stderr");
-                }
-                elsif ($bwa_alg eq 'mem') {
-                    &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaMem${sp}.msg$$.stderr");
-                }
-                else {die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln, mem, or bwasw (or set use_stampy=1)";}
+                   #Build stampy genome file
+                   &Utils::system_call("stampy.py","-G", "$sp.stampy.msg", "$genomes_fa{$sp}.msg", "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
+                   #Build stampy hash file
+                   &Utils::system_call("stampy.py","-g", "$sp.stampy.msg", "-H", "$sp.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
+                   #Call stampy mapping with or without bwa
+                   my $bwa_options = "";
+                   if ($stampy_premap_w_bwa == 1) {
+                      $bwa_options = "--bwaoptions=\"-q10 $genomes_fa{$sp}.msg\"";
+                   }
+                   if ($stampy_pseudo_threads > 0 and $cluster == 1) {
+                      run_stampy_on_cluster($sp, $bwa_options, $out, $stampy_pseudo_threads, $reads_for_updating_fq{$sp}, $parent_stampy_substitution_rate);
+                   } else {
+                      #Standard Stampy run w/o qsub
+                      &Utils::system_call("stampy.py", $bwa_options, 
+                         "-g", "$sp.stampy.msg", "-h", "$sp.stampy.msg", 
+                         "--substitutionrate", $parent_stampy_substitution_rate,
+                         "-M", $reads_for_updating_fq{$sp}, "-o", "$out.sam", "> $logdir/stampyRun${sp}.msg$$.stdout 2> $logdir/stampyRun${sp}.msg$$.stderr");
+                   }                    
+                } elsif ($bwa_alg eq 'aln') {
+                   &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sai", "2> $logdir/bwaAln${sp}.msg$$.stderr");
+                   &Utils::system_call("bwa", "samse", "$genomes_fa{$sp}.msg", "$out.sai", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSamse${sp}.msg$$.stderr");
+                } elsif ($bwa_alg eq 'bwasw') {
+                   &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaSW${sp}.msg$$.stderr");
+                } elsif ($bwa_alg eq 'mem') {
+                   &Utils::system_call("bwa", $bwa_alg, "-t", $bwa_threads, "$genomes_fa{$sp}.msg", $reads_for_updating_fq{$sp}, "> $out.sam", "2> $logdir/bwaMem${sp}.msg$$.stderr");
+                } else {
+                   die "Invalid bwa_alg parameter and not using stampy: $bwa_alg. Must be aln, mem, or bwasw (or set use_stampy=1)";
+               }
 
             }
             
             # Filter out unmapped reads, etc
             &Utils::system_call("$src/filter-sam.py", "-i", "$out.sam", "-o", "$out.filtered.sam", "-a", $bwa_alg, "-s", $use_stampy, "> $logdir/filter-sam${sp}.msg$$.stdout 2> $logdir/filter-sam${sp}.msg$$.stderr") ;
             if ($parent_mapq_filter > 0) {
-                &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
-            }
-            else {
-                &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
+               &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-q $parent_mapq_filter", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
+            } else {
+               &Utils::system_call($samtools_path, "view", "-bt", "$genomes_fa{$sp}.msg.fai", "-o $out.bam", "$out.filtered.sam", "> $logdir/samtoolsView${sp}.msg$$.stdout 2> $logdir/samtoolsView${sp}.msg$$.stderr");
             }
             &Utils::system_call($samtools_path, "sort", "$out.bam", "$out.bam.sorted", "> $logdir/samtoolsSort${sp}.msg$$.stdout 2> $logdir/samtoolsSort${sp}.msg$$.stderr");
             
-            if (($GEN_MD_TAGS == $true) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
-                if ($debug == $true) {
-                    &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam");
-                }
-                #Put back in MD tags, bwasw and stampy omit them:
-                &Utils::system_call($samtools_path, "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam", "2> $logdir/samtoolsCalmd${sp}.msg$$.stderr");
-                if ($debug == $true) {
-                    #copy instead of move for debug mode so we can view each step
-                    &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam");               
-                }
-                else {
-                    #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
-                    &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam");
-                }
+            if (($GEN_MD_TAGS == 1) && ($bwa_alg eq 'bwasw' || $use_stampy == 1)) {
+               if ($debug) {
+                  &Utils::system_call("cp","-f","$out.bam.sorted.bam","$out.bam.sorted.bam.beforecalmd.bam");
+               }
+               #Put back in MD tags, bwasw and stampy omit them:
+               &Utils::system_call($samtools_path, "calmd", "-b", "$out.bam.sorted.bam", "$genomes_fa{$sp}.msg", "> $out.sorted.calmd.bam", "2> $logdir/samtoolsCalmd${sp}.msg$$.stderr");
+               if ($debug) {
+                  #copy instead of move for debug mode so we can view each step
+                  &Utils::system_call("cp","-f","$out.sorted.calmd.bam","$out.bam.sorted.bam");               
+               } else {
+                  #Can't output calmd/view to overwrite $out.sam since view starts overwriting as data is piped in, so do a move after the fact.
+                  &Utils::system_call("mv","$out.sorted.calmd.bam","$out.bam.sorted.bam");
+               }
             }
             &Utils::system_call($samtools_path, "index", "$out.bam.sorted.bam", "> $logdir/samtoolsIndex${sp}.msg$$.stdout 2> $logdir/samtoolsIndex${sp}.msg$$.stderr");
             #When possible, we should be able to switch between pileup and mpileup seamlessly
             &Utils::system_call($samtools_path, "pileup", "-f", "$genomes_fa{$sp}.msg", "$out.bam.sorted.bam", "-c", "> $out.pileup", "2> $logdir/samtoolsPileup${sp}.msg$$.stderr");
 
-        }
+      }
 
-        #Update the parent genome with the newly mapped reads
-        #Note: updateRef.pl uses the consensus base from samtools pileup for dealing with indels
-        #so unless we rewrite that section to use other data from a pileup generated by mpileup,
-        #we won't be able to remove the version constraint of samtools
-		&Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
-            $max_coverage_exceeded_state, $max_coverage_stds, "> $logdir/updateRef${sp}.msg$$.stdout 2> $logdir/updateRef${sp}.msg$$.stderr");
-						
-		## Re-run BWA against updated refs
-		## Not doing that at the moment
-		&post_update_cleanup($sp, $reads_for_updating_fq{$sp}, $out);
-	}
-	print "Finished updating genomes\n" ;
-	exit;
+      #Update the parent genome with the newly mapped reads
+      #Note: updateRef.pl uses the consensus base from samtools pileup for dealing with indels
+      #so unless we rewrite that section to use other data from a pileup generated by mpileup,
+      #we won't be able to remove the version constraint of samtools
+      &Utils::system_call("perl", "$src/updateRef.pl", "$genomes_fa{$sp}.msg", "$out.pileup", "0", $update_minQV, $min_coverage,
+         $max_coverage_exceeded_state, $max_coverage_stds, "> $logdir/updateRef${sp}.msg$$.stdout 2> $logdir/updateRef${sp}.msg$$.stderr");
+
+      ## Re-run BWA against updated refs
+      ## Not doing that at the moment
+      &post_update_cleanup($sp, $reads_for_updating_fq{$sp}, $out);
+   }
+   print "Finished updating genomes\n" ;
+   exit;
 }
 
 
@@ -371,16 +367,16 @@ if( $update_genomes ) {
 ## Use BWA to align raw reads against genomes, creating two sam files for each parent ref
 my %genomes;
 for my $sp (keys %genomes_fa) {
-	-e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}";
+   -e $genomes_fa{$sp} or die "No such file: $genomes_fa{$sp}";
 
    my ($d, $s);
-	($genomes{$sp}, $d, $s) = fileparse $genomes_fa{$sp}, qr/\.[^.]*$/;
-	$s eq ".fa" or $s eq ".fasta" or $s eq ".gz" or print "$sp genome extension is $s: expecting .fa or .fasta\n";
+   ($genomes{$sp}, $d, $s) = fileparse $genomes_fa{$sp}, qr/\.[^.]*$/;
+   $s eq ".fa" or $s eq ".fasta" or $s eq ".gz" or print "$sp genome extension is $s: expecting .fa or .fasta\n";
 	
-	if ($parse_or_map eq 'parse-only') {
-		### reformat for samtools (60 chars per line)
-		&Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa", "> $logdir/reformatFasta4sam${sp}.msg$$.stdout 2> $logdir/reformatFasta4sam${sp}.msg$$.stderr") unless (-e "${sp}_ref.fa");
-	}
+   if ($parse_or_map eq 'parse-only') {
+      ### reformat for samtools (60 chars per line)
+      &Utils::system_call("perl", "$src/reformatFasta4sam.pl", "-i", "$genomes_fa{$sp}", "-o", "${sp}_ref.fa", "> $logdir/reformatFasta4sam${sp}.msg$$.stdout 2> $logdir/reformatFasta4sam${sp}.msg$$.stderr") unless (-e "${sp}_ref.fa");
+   }
 }
 
 
@@ -389,24 +385,24 @@ $parse_or_map = "--$parse_or_map" if ($parse_or_map);
 
 ### BWA INDEXING
 foreach my $sp ( keys %genomes ) {
-	unless( -e "$genomes_fa{$sp}.bwt" and -e "$genomes_fa{$sp}.ann" ) {
-		## 1. Align reads against existing genome -> sam file
-		## Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
-		#@args = ("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}) ;
-		print "Running index on reformatted fa:\n";
+   unless( -e "$genomes_fa{$sp}.bwt" and -e "$genomes_fa{$sp}.ann" ) {
+      ## 1. Align reads against existing genome -> sam file
+      ## Always call index ( though you don't need it if $use_stampy = 1 and $stampy_premap_w_bwa = 0)
+      #@args = ("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}) ;
+      print "Running index on reformatted fa:\n";
       #Replacing this system() call with &Utils::system_call() call
       &Utils::system_call("bwa", "index", "-a", $genome_index{$sp}, $genomes_fa{$sp}, "> $logdir/bwaIndex${sp}.msg$$.stdout 2> $logdir/bwaIndex${sp}.msg$$.stderr");
-		#print "@args\n" ;
-		#system("@args") == 0 or die "Error in @args: $?" ;
-		#When mapping with stampy, perform the genome and hash building steps here
-        if ($use_stampy == 1) {
-            #Build stampy genome file
-            &Utils::system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}, "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
-            #Build stampy hash file
-            &Utils::system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
-                "$genomes_fa{$sp}.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
-        }
-	}
+      #print "@args\n" ;
+      #system("@args") == 0 or die "Error in @args: $?" ;
+      #When mapping with stampy, perform the genome and hash building steps here
+      if ($use_stampy == 1) {
+         #Build stampy genome file
+         &Utils::system_call("stampy.py","-G", "$genomes_fa{$sp}.stampy.msg", $genomes_fa{$sp}, "> $logdir/stampyG${sp}.msg$$.stdout 2> $logdir/stampyG${sp}.msg$$.stderr");
+         #Build stampy hash file
+         &Utils::system_call("stampy.py","-g", "$genomes_fa{$sp}.stampy.msg", "-H", 
+            "$genomes_fa{$sp}.stampy.msg", "> $logdir/stampyH${sp}.msg$$.stdout 2> $logdir/stampyH${sp}.msg$$.stderr");
+      }
+   }
 }
 
 
@@ -415,18 +411,18 @@ foreach my $sp ( keys %genomes ) {
 my $samfiles_dir = basename($raw_read_data) . "_sam_files";
 mkdir $samfiles_dir unless (-d $samfiles_dir);
 &Utils::system_call('python', "$src/parse_and_map.py", '-i', $raw_read_data, '-b', $barcodes,
-		 '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
-       '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
-        $bwa_alg, '--bwa_threads', $bwa_threads, 
-        '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa,
-        '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
-        '--indiv_mapq_filter', $indiv_mapq_filter, '--index_file', $index_file,
-        '--index_barcodes', $index_barcodes, '--quality_trim_reads_thresh', $quality_trim_reads_thresh || '0',
-        '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug,
-        '--new_parser', $new_parser || '0', '--new_parser_offset', $new_parser_offset || '0',
-        '--new_parser_filter_out_seq', $new_parser_filter_out_seq || 'null',
-        '--samtools_path', $samtools_path,
-        "> $logdir/parseAndMap.msg$$.stdout 2> $logdir/parseAndMap.msg$$.stderr");
+      '--parent1', $genomes_fa{'parent1'}, '--parent2', $genomes_fa{'parent2'}, $parse_or_map,
+      '--re_cutter', $re_cutter, '--linker_system', $linker_system, '--bwa_alg', 
+      $bwa_alg, '--bwa_threads', $bwa_threads, 
+      '--use_stampy', $use_stampy, '--stampy_premap_w_bwa', $stampy_premap_w_bwa,
+      '--indiv_stampy_substitution_rate', $indiv_stampy_substitution_rate,
+      '--indiv_mapq_filter', $indiv_mapq_filter, '--index_file', $index_file,
+      '--index_barcodes', $index_barcodes, '--quality_trim_reads_thresh', $quality_trim_reads_thresh || '0',
+      '--quality_trim_reads_consec', $quality_trim_reads_consec || '0','--dbg', $debug,
+      '--new_parser', $new_parser || '0', '--new_parser_offset', $new_parser_offset || '0',
+      '--new_parser_filter_out_seq', $new_parser_filter_out_seq || 'null',
+      '--samtools_path', $samtools_path,
+      "> $logdir/parseAndMap.msg$$.stdout 2> $logdir/parseAndMap.msg$$.stderr");
 
 ## Strip species out of reference column
 
@@ -437,43 +433,143 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
 if ($parse_or_map eq '--map-only') {
    print "\nFit HMM to estimate ancestry...\n";
 
-	open (BARCODE,$barcodes) || die "ERROR: Can't open $barcodes: $!\n";
+   open (BARCODE, "<", $barcodes) || die "ERROR: Can't open $barcodes: $!\n";
+
+   #Modified the simple loop to parallelize via forking with semaphore:
+   #Semaphore is a FIFO, uses a simple 1-byte token
+   #Timing info usually provided by Utils::system_call() is output to
+   # child-specific file, and collated upon return of wait on child to
+   # print to STDOUT of parent.
+   #Quickly set up simple signal handlers for SIGINT and SIGTERM as per
+   # https://www.perl.com/article/fork-yeah-/
+   #Not sure if _exit vs. exit makes a difference, but perldoc perlfork
+   # did indicate _exit is safer in one circumstance, also see
+   # https://stackoverflow.com/questions/5422831/what-is-the-difference-between-using-exit-exit-in-a-conventional-linux-fo
+   $SIG{INT} = sub { POSIX::_exit(2) }; #SIGINT is signal 2
+   $SIG{TERM} = sub { POSIX::_exit(15) }; #SIGTERM is signal 15
+   #Set autoflush to 1 to mitigate some concurrency issues:
+   $| = 1;
+   #Set up the FIFO with the appropriate number of tokens:
+   my $FIFO_path = ".msg.parent1or2-hmm.fifo";
+   unlink($FIFO_path) if -p $FIFO_path; #Delete old FIFO if exists
+   system("mkfifo", $FIFO_path) == 0 or die "Failed to create FIFO ${FIFO_path} for parallelizing parent1or2-hmm.sh calls: Exit code $?";
+   #Initialize the FIFO with $n_parallel number of tokens:
+   my $fifo_fh;
+   #It's critical to open in rw mode, since open will block until both are present...
+   open($fifo_fh, "+<:raw", $FIFO_path) or die "Failed to open FIFO ${FIFO_path} for writing semaphore tokens";
+   print STDOUT "Adding ${n_parallel} tokens to the semaphore ${FIFO_path}: ", "p"x$n_parallel, "\n";
+   print $fifo_fh "p"x$n_parallel; #The actual contents of the token don't matter
+   #Array to store child process IDs for waiting and collating output:
+   my @fork_ids = ();
+   my $parent_id = $$;
+
    foreach my $bc_line (<BARCODE>) {
-	   chomp $bc_line;
+      chomp $bc_line;
 
-   	# fastq_file = 'indiv' + ind[1] + '_' + ind[0]
-   	my @bc_bits = split(/\s+/,$bc_line);
-   	my $indiv = 'indiv' . $bc_bits[1] . '_' . $bc_bits[0];
-      print "\t$indiv\n";
-   
-   	&Utils::system_call('bash', "$src/parent1or2-hmm.sh",
-             '-a', $recRate,
-   			 '-b', $barcodes,
-   			 '-c', $chroms,
-             '-e', $use_stampy,
-   			 '-f', $deltapar1,
-   			 '-g', $deltapar2,
-   			 '-i', $indiv,
-             '-j', $pepthresh,
-             '-k', $repeat_threshold,
-             '-l', $read_length,
-             '-m', $gff_thresh_conf,
-             '-n', $max_mapped_reads,
-   			 '-o', 'hmm_data',
-   			 '-p', $genomes_fa{'parent1'},
-   			 '-q', $genomes_fa{'parent2'},             
-   			 '-r', $rfac,
-   			 '-R', 'hmm_fit',
-   			 '-s', $samfiles_dir,
-             '-S', $samtools_path,
-   			 '-t', $theta,
-             '-u', $one_site_per_contig,
-             '-v', $filter_hmmdata,
-             '-w', $bwa_alg,
-   			 '-x', $sexchroms,
-   			 '-y', $chroms2plot,
-   			 '-z', $priors,
-   		  "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
+      # fastq_file = 'indiv' + ind[1] + '_' + ind[0]
+      my @bc_bits = split(/\s+/,$bc_line);
+      my $indiv = 'indiv' . $bc_bits[1] . '_' . $bc_bits[0];
 
-   } close BARCODE;
+      #Now we get to the actual forking work:
+      my $fork_id = fork;
+      unless (defined($fork_id)) {
+         print "Failed to fork ${indiv}, got error code $!\n";
+         kill 'TERM', @fork_ids;
+         exit; #This can be exit, since fork failed, hence parent only
+      } elsif ($fork_id == 0) { #Child process, so set up the timer and call parent1or2-hmm.sh
+         #Pull a token from the semaphore with a blocking read:
+         my $semaphore_fh;
+         print STDOUT "Opening semaphore ${FIFO_path} in child $$\n"; #Debugging
+         unless (open($semaphore_fh, "+<:raw", $FIFO_path)) {
+            POSIX::_exit(253); #253 is failure to open semaphore while in child
+         }
+         print STDOUT "Blocking read for token in child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
+         my $token;
+         sysread $semaphore_fh, $token, 1; #Skipping error handling of sysread
+         print STDOUT "Read token ${token} in child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
+         #Set up the per-child output file:
+         my $child_stdout = "${logdir}/parent1or2hmm_fifo_$$.stdout";
+         my $child_stdout_fh;
+         unless (open($child_stdout_fh, ">", $child_stdout)) {
+            #Be sure to put a token back into the semaphore:
+            print $semaphore_fh $token;
+            print STDOUT "Failed to open temporary STDOUT file ${child_stdout} in child $$, rewrote ${token} to semaphore.\n";
+            close($semaphore_fh);
+            POSIX::_exit(254); #254 is failure to open temporary STDOUT file in child
+         }
+         print $child_stdout_fh "\t$indiv\n";
+         #Timing info usually provided by Utils::system_call():
+         print $child_stdout_fh "\nstarted ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
+         my $parent1or2hmm_call = join(" ",
+            'bash', "$src/parent1or2-hmm.sh",
+            '-a', $recRate,
+            '-b', $barcodes,
+            '-c', $chroms,
+            '-e', $use_stampy,
+            '-f', $deltapar1,
+            '-g', $deltapar2,
+            '-i', $indiv,
+            '-j', $pepthresh,
+            '-k', $repeat_threshold,
+            '-l', $read_length,
+            '-m', $gff_thresh_conf,
+            '-n', $max_mapped_reads,
+            '-o', 'hmm_data',
+            '-p', $genomes_fa{'parent1'},
+            '-q', $genomes_fa{'parent2'},             
+            '-r', $rfac,
+            '-R', 'hmm_fit',
+            '-s', $samfiles_dir,
+            '-S', $samtools_path,
+            '-t', $theta,
+            '-u', $one_site_per_contig,
+            '-v', $filter_hmmdata,
+            '-w', $bwa_alg,
+            '-x', $sexchroms,
+            '-y', $chroms2plot,
+            '-z', $priors,
+            "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
+         print $child_stdout_fh "  ${parent1or2hmm_call}\n";
+         print STDOUT "Running parent1or2-hmm.sh for indiv ${indiv} in child $$\n"; #Debugging
+         `${parent1or2hmm_call}`;
+         my $parent1or2_exitcode = $?;
+         #Timing info usually from Utils::system_call():
+         print $child_stdout_fh "Error in ${parent1or2hmm_call}: ${parent1or2_exitcode}\n" unless $parent1or2_exitcode == 0;
+         #Slight variation on orig code: Always output end time, not just when successful
+         print $child_stdout_fh "ended ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
+         close($child_stdout_fh);
+         print STDOUT "Adding token ${token} back into the semaphore from child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
+         #We're done, so put a token back in the semaphore:
+         print $semaphore_fh $token;
+         close($semaphore_fh);
+         print STDOUT "Child $$ is exiting with code ${parent1or2_exitcode}\n"; #Debugging
+         POSIX::_exit(${parent1or2_exitcode});
+      } else {
+         push @fork_ids, $fork_id;
+         print STDOUT "Forked child ${fork_id} for individual ${indiv} at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
+      }
+   }
+   close(BARCODE);
+   #Now iterate over the child PIDs
+   print STDOUT "Done forking, now waiting on children\n"; #Debugging
+   for my $pid (@fork_ids) {
+      print STDOUT "Waiting on PID ${pid} at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
+      waitpid $pid, 0; #Blocking wait, should never return -1
+      my $child_exitcode = $?;
+      print STDOUT "Got exit code ${child_exitcode} from PID ${pid}\n"; #Debugging
+      #Collate the timing info and call details:
+      print STDOUT "Grabbing STDOUT from child ${pid} in temporary file ${logdir}/parent1or2hmm_fifo_${pid}.stdout\n"; #Debugging
+      my $stdout_fh;
+      open($stdout_fh, "<", "${logdir}/parent1or2hmm_fifo_${pid}.stdout") or die "Unable to collate timing information from parent1or2-hmm.sh wrapper fork ${pid}: $!";
+      print STDOUT $_ while <$stdout_fh>;
+      close($stdout_fh);
+      print STDOUT "Fork returned with exit code ${child_exitcode}\n";
+      #Can comment this out later, but let's unlink the temporary STDOUT files:
+      print STDOUT "Removing temporary STDOUT file ${logdir}/parent1or2hmm_fifo_${pid}.stdout\n"; #Debugging
+      unlink("${logdir}/parent1or2hmm_fifo_${pid}.stdout");
+   }
+   #Close the FIFO connection:
+   close($fifo_fh);
+   #Reset autoflush:
+   $| = 0;
 }

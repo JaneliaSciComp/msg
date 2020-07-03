@@ -13,7 +13,7 @@ die () {
 src=$(dirname $0)
 
 while getopts "a:b:c:e:f:g:h:i:j:k:l:m:n:o:p:q:r:R:s:S:t:u:v:w:x:y:z:" opt
-do 
+do
   case $opt in
       a) recRate=$OPTARG ;;
       b) barcodes=$OPTARG ;;
@@ -29,7 +29,7 @@ do
       n) max_mapped_reads=$OPTARG ;;
       o) outdir=$OPTARG ;;
       p) parent1=$OPTARG ;;
-      q) parent2=$OPTARG ;;     
+      q) parent2=$OPTARG ;;
       r) rfac=$OPTARG ;;
       R) Routdir=$OPTARG ;;
       s) samdir=$OPTARG ;;
@@ -40,7 +40,7 @@ do
       w) bwaalg=$OPTARG ;;
       x) sexchroms=$OPTARG ;;
       y) chroms2plot=$OPTARG ;;
-      z) priors=$OPTARG ;; 
+      z) priors=$OPTARG ;;
       
       *) usage ;;
   esac
