@@ -193,7 +193,13 @@ class App(CommandLineApp):
         if os.path.exists(self.refsdir): 
             shutil.rmtree(self.refsdir)
             assert not os.path.exists(self.refsdir)
-        os.mkdir(self.refsdir)
+        #Just in case of filesystem desync, let's catch the possible exception:
+        try:
+            os.mkdir(self.refsdir)
+        except OSError as e:
+            print 'os.mkdir possibly? on existing path in main() after rmtree()'
+            print 'errno:{}, description:{}, path passed:{}'.format(e.errno, e.strerror, e.filename)
+            raise
 
         #Disabling garbage collection seemed to take about 7% off of the run time
         #in my testing.
@@ -237,7 +243,13 @@ class App(CommandLineApp):
         sec_outfilename = 'aln_' + self.options.indiv + '_par2-filtered.sam'
 
 
-        if not os.path.exists(self.options.outdir): os.mkdir(self.options.outdir)
+        #Instead of doing conditional os.mkdir, just handle exception:
+#        if not os.path.exists(self.options.outdir): os.mkdir(self.options.outdir)
+        try:
+            os.mkdir(self.options.outdir)
+        except OSError as e:
+            print 'os.mkdir possibly? on existing path in main() after opening SAMs'
+            print 'errno:{}, description:{}, path passed:{}'.format(e.errno, e.strerror, e.filename)
         if not os.path.exists(self.options.outdir):
             print bcolors.FAIL + 'ERROR in extract-ref-alleles: %s does not exist!' % self.refsdir + bcolors.ENDC
             sys.exit(2)
@@ -513,7 +525,13 @@ class App(CommandLineApp):
         """
         for sp in refsp:
             outdir = os.path.join(self.refsdir, sp)
-            if not os.path.exists(outdir): os.mkdir(outdir)
+            #Instead of conditional os.mkdir, catch the exception:
+#            if not os.path.exists(outdir): os.mkdir(outdir)
+            try:
+               os.mkdir(outdir)
+            except OSError as e:
+               print 'os.mkdir possibly? on existing path in store_and_remove_alleles_orths()'
+               print 'errno:{}, description:{}, path passed:{}'.format(e.errno, e.strerror, e.filename)
             
             for ref in refs[sp].keys():
                 d = refs[sp][ref]
