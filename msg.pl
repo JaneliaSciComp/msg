@@ -430,146 +430,47 @@ mkdir $samfiles_dir unless (-d $samfiles_dir);
 
 ## Fit HMM to estimate ancestry
 
+# code copied from msg.pl provided by David:
 if ($parse_or_map eq '--map-only') {
    print "\nFit HMM to estimate ancestry...\n";
 
-   open (BARCODE, "<", $barcodes) || die "ERROR: Can't open $barcodes: $!\n";
-
-   #Modified the simple loop to parallelize via forking with semaphore:
-   #Semaphore is a FIFO, uses a simple 1-byte token
-   #Timing info usually provided by Utils::system_call() is output to
-   # child-specific file, and collated upon return of wait on child to
-   # print to STDOUT of parent.
-   #Quickly set up simple signal handlers for SIGINT and SIGTERM as per
-   # https://www.perl.com/article/fork-yeah-/
-   #Not sure if _exit vs. exit makes a difference, but perldoc perlfork
-   # did indicate _exit is safer in one circumstance, also see
-   # https://stackoverflow.com/questions/5422831/what-is-the-difference-between-using-exit-exit-in-a-conventional-linux-fo
-   $SIG{INT} = sub { POSIX::_exit(2) }; #SIGINT is signal 2
-   $SIG{TERM} = sub { POSIX::_exit(15) }; #SIGTERM is signal 15
-   #Set autoflush to 1 to mitigate some concurrency issues:
-   $| = 1;
-   #Set up the FIFO with the appropriate number of tokens:
-   my $FIFO_path = ".msg.parent1or2-hmm.fifo";
-   unlink($FIFO_path) if -p $FIFO_path; #Delete old FIFO if exists
-   system("mkfifo", $FIFO_path) == 0 or die "Failed to create FIFO ${FIFO_path} for parallelizing parent1or2-hmm.sh calls: Exit code $?";
-   #Initialize the FIFO with $n_parallel number of tokens:
-   my $fifo_fh;
-   #It's critical to open in rw mode, since open will block until both are present...
-   open($fifo_fh, "+<:raw", $FIFO_path) or die "Failed to open FIFO ${FIFO_path} for writing semaphore tokens";
-   print STDOUT "Adding ${n_parallel} tokens to the semaphore ${FIFO_path}: ", "p"x$n_parallel, "\n";
-   print $fifo_fh "p"x$n_parallel; #The actual contents of the token don't matter
-   #Array to store child process IDs for waiting and collating output:
-   my @fork_ids = ();
-   my $parent_id = $$;
-
+    open (BARCODE,$barcodes) || die "ERROR: Can't open $barcodes: $!\n";
    foreach my $bc_line (<BARCODE>) {
-      chomp $bc_line;
+       chomp $bc_line;
 
-      # fastq_file = 'indiv' + ind[1] + '_' + ind[0]
-      my @bc_bits = split(/\s+/,$bc_line);
-      my $indiv = 'indiv' . $bc_bits[1] . '_' . $bc_bits[0];
+    # fastq_file = 'indiv' + ind[1] + '_' + ind[0]
+    my @bc_bits = split(/\s+/,$bc_line);
+    my $indiv = 'indiv' . $bc_bits[1] . '_' . $bc_bits[0];
+      print "\t$indiv\n";
+   
+    &Utils::system_call('bash', "$src/parent1or2-hmm.sh",
+             '-a', $recRate,
+             '-b', $barcodes,
+             '-c', $chroms,
+             '-e', $use_stampy,
+             '-f', $deltapar1,
+             '-g', $deltapar2,
+             '-i', $indiv,
+             '-j', $pepthresh,
+             '-k', $repeat_threshold,
+             '-l', $read_length,
+             '-m', $gff_thresh_conf,
+             '-n', $max_mapped_reads,
+             '-o', 'hmm_data',
+             '-p', $genomes_fa{'parent1'},
+             '-q', $genomes_fa{'parent2'},             
+             '-r', $rfac,
+             '-R', 'hmm_fit',
+             '-s', $samfiles_dir,
+             '-S', $samtools_path,
+             '-t', $theta,
+             '-u', $one_site_per_contig,
+             '-v', $filter_hmmdata,
+             '-w', $bwa_alg,
+             '-x', $sexchroms,
+             '-y', $chroms2plot,
+             '-z', $priors,
+          "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
 
-      #Now we get to the actual forking work:
-      my $fork_id = fork;
-      unless (defined($fork_id)) {
-         print "Failed to fork ${indiv}, got error code $!\n";
-         kill 'TERM', @fork_ids;
-         exit; #This can be exit, since fork failed, hence parent only
-      } elsif ($fork_id == 0) { #Child process, so set up the timer and call parent1or2-hmm.sh
-         #Pull a token from the semaphore with a blocking read:
-         my $semaphore_fh;
-         print STDOUT "Opening semaphore ${FIFO_path} in child $$\n"; #Debugging
-         unless (open($semaphore_fh, "+<:raw", $FIFO_path)) {
-            POSIX::_exit(253); #253 is failure to open semaphore while in child
-         }
-         print STDOUT "Blocking read for token in child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
-         my $token;
-         sysread $semaphore_fh, $token, 1; #Skipping error handling of sysread
-         print STDOUT "Read token ${token} in child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
-         #Set up the per-child output file:
-         my $child_stdout = "${logdir}/parent1or2hmm_fifo_$$.stdout";
-         my $child_stdout_fh;
-         unless (open($child_stdout_fh, ">", $child_stdout)) {
-            #Be sure to put a token back into the semaphore:
-            print $semaphore_fh $token;
-            print STDOUT "Failed to open temporary STDOUT file ${child_stdout} in child $$, rewrote ${token} to semaphore.\n";
-            close($semaphore_fh);
-            POSIX::_exit(254); #254 is failure to open temporary STDOUT file in child
-         }
-         print $child_stdout_fh "\t$indiv\n";
-         #Timing info usually provided by Utils::system_call():
-         print $child_stdout_fh "\nstarted ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
-         my $parent1or2hmm_call = join(" ",
-            'bash', "$src/parent1or2-hmm.sh",
-            '-a', $recRate,
-            '-b', $barcodes,
-            '-c', $chroms,
-            '-e', $use_stampy,
-            '-f', $deltapar1,
-            '-g', $deltapar2,
-            '-i', $indiv,
-            '-j', $pepthresh,
-            '-k', $repeat_threshold,
-            '-l', $read_length,
-            '-m', $gff_thresh_conf,
-            '-n', $max_mapped_reads,
-            '-o', 'hmm_data',
-            '-p', $genomes_fa{'parent1'},
-            '-q', $genomes_fa{'parent2'},             
-            '-r', $rfac,
-            '-R', 'hmm_fit',
-            '-s', $samfiles_dir,
-            '-S', $samtools_path,
-            '-t', $theta,
-            '-u', $one_site_per_contig,
-            '-v', $filter_hmmdata,
-            '-w', $bwa_alg,
-            '-x', $sexchroms,
-            '-y', $chroms2plot,
-            '-z', $priors,
-            "> $logdir/parent1or2-hmm${indiv}.msg$$.stdout 2> $logdir/parent1or2-hmm${indiv}.msg$$.stderr");
-         print $child_stdout_fh "  ${parent1or2hmm_call}\n";
-         print STDOUT "Running parent1or2-hmm.sh for indiv ${indiv} in child $$\n"; #Debugging
-         `${parent1or2hmm_call}`;
-         my $parent1or2_exitcode = $?;
-         #Timing info usually from Utils::system_call():
-         print $child_stdout_fh "Error in ${parent1or2hmm_call}: ${parent1or2_exitcode}\n" unless $parent1or2_exitcode == 0;
-         #Slight variation on orig code: Always output end time, not just when successful
-         print $child_stdout_fh "ended ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime);
-         close($child_stdout_fh);
-         print STDOUT "Adding token ${token} back into the semaphore from child $$ at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
-         #We're done, so put a token back in the semaphore:
-         print $semaphore_fh $token;
-         close($semaphore_fh);
-         print STDOUT "Child $$ is exiting with code ${parent1or2_exitcode}\n"; #Debugging
-         POSIX::_exit(${parent1or2_exitcode});
-      } else {
-         push @fork_ids, $fork_id;
-         print STDOUT "Forked child ${fork_id} for individual ${indiv} at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
-      }
-   }
-   close(BARCODE);
-   #Now iterate over the child PIDs
-   print STDOUT "Done forking, now waiting on children\n"; #Debugging
-   for my $pid (@fork_ids) {
-      print STDOUT "Waiting on PID ${pid} at ", POSIX::strftime("%m/%d/%Y %H:%M:%S\n", localtime); #Debugging
-      waitpid $pid, 0; #Blocking wait, should never return -1
-      my $child_exitcode = $?;
-      print STDOUT "Got exit code ${child_exitcode} from PID ${pid}\n"; #Debugging
-      #Collate the timing info and call details:
-      print STDOUT "Grabbing STDOUT from child ${pid} in temporary file ${logdir}/parent1or2hmm_fifo_${pid}.stdout\n"; #Debugging
-      my $stdout_fh;
-      open($stdout_fh, "<", "${logdir}/parent1or2hmm_fifo_${pid}.stdout") or die "Unable to collate timing information from parent1or2-hmm.sh wrapper fork ${pid}: $!";
-      print STDOUT $_ while <$stdout_fh>;
-      close($stdout_fh);
-      print STDOUT "Fork returned with exit code ${child_exitcode}\n";
-      #Can comment this out later, but let's unlink the temporary STDOUT files:
-      print STDOUT "Removing temporary STDOUT file ${logdir}/parent1or2hmm_fifo_${pid}.stdout\n"; #Debugging
-      unlink("${logdir}/parent1or2hmm_fifo_${pid}.stdout");
-   }
-   #Close the FIFO connection:
-   close($fifo_fh);
-   #Reset autoflush:
-   $| = 0;
+   } close BARCODE;
 }
