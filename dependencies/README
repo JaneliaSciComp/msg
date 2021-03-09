@@ -21,3 +21,5 @@ http://sourceforge.net/projects/bio-bwa/files/
 http://code.google.com/p/pysam/source/checkout
 http://code.google.com/p/pysam/issues/detail?id=22&can=1&q=dandavison0
 
+2021:
+- updated directory contents for the work we did in containerizing MSG in this repo: https://github.com/JaneliaSciComp/msg-docker
