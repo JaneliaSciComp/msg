@@ -3,6 +3,12 @@ http://genomics.princeton.edu/AndolfattoLab/MSG.html
 https://github.com/JaneliaSciComp/msg
 http://www.ncbi.nlm.nih.gov/pubmed/21233398
 
+# This branch is deprecated!
+
+The master branch contains older, deprectated code.  Use the dev branch of this repository for the latest improvements.
+
+Most of the improvements come from the fork at https://github.com/YourePrettyGood/msg, on their dev branch, so we are matching them rather than merging back to master.
+
 ### Dependencies ###
 Run test_dependencies.sh to check for the existence of dependencies
 
