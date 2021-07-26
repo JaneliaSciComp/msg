@@ -7,7 +7,7 @@ http://www.ncbi.nlm.nih.gov/pubmed/21233398
 
 **Switch to the dev branch instead.**
 
-The master branch contains older, deprectated code.  Use the dev branch of this repository for the latest improvements. Most of the improvements come from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. We are matching their convention rather than merging the changes back to master.
+The master branch contains older, deprecated code.  Use the dev branch of this repository for the latest improvements. Most of the improvements come from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. We are matching their branch convention rather than merging the changes back to master.
 
 ### Dependencies ###
 Run test_dependencies.sh to check for the existence of dependencies
