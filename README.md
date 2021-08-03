@@ -1,13 +1,11 @@
-MSG: Multiplexed Shotgun Genotyping
+# MSG: Multiplexed Shotgun Genotyping
 http://genomics.princeton.edu/AndolfattoLab/MSG.html
 https://github.com/JaneliaSciComp/msg
 http://www.ncbi.nlm.nih.gov/pubmed/21233398
 
-# This branch is deprecated!
+**This version is outdated**
 
-**Switch to the dev branch instead.**
-
-The master branch contains older, deprecated code.  Use the dev branch of this repository for the latest improvements. Most of the improvements come from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. We are matching their branch convention rather than merging the changes back to master.
+The next version has had improvements merged from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. In addition, the newer version has been containerized. See the more recent README.
 
 ### Dependencies ###
 Run test_dependencies.sh to check for the existence of dependencies
