@@ -5,7 +5,7 @@ http://www.ncbi.nlm.nih.gov/pubmed/21233398
 
 **This version is outdated**
 
-See dev branch for the latest version. It has had improvements merged from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. In addition, it has been containerized. See the README on deb branch for details.
+See dev branch for the latest version. It has had improvements merged from the fork at https://github.com/YourePrettyGood/msg, on their dev branch. In addition, it has been containerized. See the README on dev branch for details.
 
 ### Dependencies ###
 Run test_dependencies.sh to check for the existence of dependencies
