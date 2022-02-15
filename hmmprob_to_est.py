@@ -11,7 +11,7 @@ File Format Details:
     Creates a new CSV file at out_path with one individual per row.
     Columns contain the est value for that indivdual at that position.
     (Columns with less than pnathresh % coverage are omitted.)
-    
+
 Usage:
 python msg/hmmprob_to_est.py -d hmm_fit -t .03 -o hmmprob_w_est.csv
 """
@@ -21,6 +21,7 @@ import sys
 import csv
 import glob
 import optparse
+import ctypes as ct
 
 from msglib import trace, get_free_memory
 
@@ -34,12 +35,16 @@ COL_POS = 1
 COL_COUNT = 15 #not used
 COL_EST = 20
 
+# Avoid CSV error field
+## source: https://stackoverflow.com/a/54517228
+csv.field_size_limit(int(ct.c_ulong(-1).value // 2))
+
 # ----------------------------------------
 
 def grab_files(dir):
     """Example from Toy data:
     glob.glob('hmm_fit/*/*-hmmprob.RData.chrom.*.csv')
-    ['hmm_fit/indivF11_GTTACG/indivF11_GTTACG-hmmprob.RData.chrom.2R.csv', 'hmm_fit/indivE2_CAGCCG/indivE2_CAGCCG-hmmprob.RData.chrom.2R.csv', 
+    ['hmm_fit/indivF11_GTTACG/indivF11_GTTACG-hmmprob.RData.chrom.2R.csv', 'hmm_fit/indivE2_CAGCCG/indivE2_CAGCCG-hmmprob.RData.chrom.2R.csv',
     'hmm_fit/indivG7_CTTGCG/indivG7_CTTGCG-hmmprob.RData.chrom.2R.csv', ...]
     """
     glob_pattern = dir.strip('/') + GLOB_PATTERN
@@ -49,8 +54,8 @@ def grab_files(dir):
 def write_csv(d_ests, out_path):
     """ Takes a (filtered) dict (See transform function for explanation of
     what d_ests is and an example of what it could contain.)
-    
-    Writes it out into a CSV file, putting everything together in one matrix.    
+
+    Writes it out into a CSV file, putting everything together in one matrix.
     """
     #Write to CSV
     outfile = open(out_path, 'wb')
@@ -81,7 +86,7 @@ def write_csv(d_ests, out_path):
         for d_ests in d_inds.values():
             all_positions |= set(d_ests.keys())
         all_positions = sorted(list(all_positions))
-        
+
         if all_positions: #only include chroms with data
             #Update header rows with these positions / chomosomes
             header_row += ['%s-%s' % (chrom, v) for v in all_positions]
@@ -93,7 +98,7 @@ def write_csv(d_ests, out_path):
                 outrow = csv_data[r[ind_name]]
                 for pos in all_positions:
                     outrow.append(ests_by_pos.get(pos,'-'))
-    
+
     outcsv.writerow(header_row)
     outcsv.writerow(chrom_row)
     outcsv.writerow(gen_map_pos_row)
@@ -112,10 +117,10 @@ def parse_path(path):
 @trace
 def transform(file_list, pnathresh):
     """
-    Groups position ests by individual and by chromosome and filters 
+    Groups position ests by individual and by chromosome and filters
     out positions with less than pnathresh % coverage.
     """
-    
+
     #d_ests stores estimates by position by individual by chromosome.
     #example:
     #    {'2R': {'indivA12_AATAAG': {'1000992': '1',
@@ -129,7 +134,7 @@ def transform(file_list, pnathresh):
     #        }
     d_ests = {}
     chrom_pos_count = {} #count of individuals with a given (chrom,position)
-    
+
     #Fill up data structure from all files
     for path in file_list:
         ind_name, chrom = parse_path(path)
@@ -159,7 +164,7 @@ def transform(file_list, pnathresh):
         for ind_name, ests_by_pos in d_inds.items():
             for pos in ests_by_pos.keys():
                 if chrom_pos_count[(chrom,pos)] < count_thresh:
-                    del d_ests[chrom][ind_name][pos]                
+                    del d_ests[chrom][ind_name][pos]
     return d_ests
 
 @trace
@@ -183,6 +188,6 @@ def main():
     d_ests = transform(all_files, opts.pnathresh)
     print "Free memory now is %s MB" % get_free_memory()
     write_csv(d_ests, opts.out_path)
-    
+
 if __name__=='__main__':
     main()
